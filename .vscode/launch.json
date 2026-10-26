@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "type": "java",
+            "name": "HelloFx",
+            "request": "launch",
+            "mainClass": "ztest.HelloFx",
+            "projectName": "msfx_2198cc6b"
+        },
+        {
+            "type": "java",
+            "name": "Run current file (JavaFX)",
+            "request": "launch",
+            "javaExec": "${env:JAVA_HOME}/bin/java.exe",
+            "mainClass": "${file}",
+            "vmArgs": [
+                "--module-path",
+                "${workspaceFolder}/java/lib/javafx/lib",
+                "--add-modules",
+                "javafx.controls,javafx.fxml"
+            ],
+            "cwd": "${workspaceFolder}/java"
+        }
+    ]
+}

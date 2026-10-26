@@ -1,0 +1,12 @@
+{
+    // Where the Java code lives (relative to the msfx folder)
+    "java.project.sourcePaths": ["java/src"],
+
+    // Where compiled .class files go
+    "java.project.outputPath": "java/bin",
+
+    // Libraries the editor should know about: the JavaFX jars
+    "java.project.referencedLibraries": [
+        "java/lib/javafx/lib/*.jar"
+    ]
+}

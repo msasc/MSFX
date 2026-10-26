@@ -1,0 +1,11 @@
+# --- Java ---------------------------------------------------------
+# Compiled classes
+java/bin/
+
+# SDKs: large binaries, downloaded separately (see setup guide)
+java/lib/jdk/
+java/lib/javafx/
+
+# --- Windows -------------------------------------------------------
+Thumbs.db
+desktop.ini
