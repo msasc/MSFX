@@ -15,6 +15,9 @@
  */
 package msfx.lib.md;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 import msfx.lib.util.Properties;
@@ -29,11 +32,6 @@ public class Column {
      * Container for the column properties.
      */
     private final Properties props = new Properties();
-    /**
-     * The type of the column, kept apart since enums are not accepted as
-     * property values.
-     */
-    private final Types type;
 
     /**
      * @param name     The name of the column.
@@ -43,7 +41,7 @@ public class Column {
      *                 applicable.
      */
     public Column(String name, Types type, int length, int decimals) {
-        this.type = Objects.requireNonNull(type, "Type can not be null");
+        Objects.requireNonNull(type, "Type can not be null");
         props.put("name", name);
         props.put("length", length);
         props.put("decimals", decimals);
@@ -75,6 +73,70 @@ public class Column {
      */
     public int getDecimals() {
         return props.getInteger("decimals");
+    }
+
+    /**
+     * Returns the possible values of the column, each with its label, in the
+     * order they were set. When not empty, the column is restricted to these
+     * values.
+     *
+     * @return An unmodifiable view of the possible values mapped to their labels,
+     *         or an empty map if none are set.
+     */
+    public Map<Value, String> getPossibleValues() {
+        LinkedHashMap<Value, String> possibleValues = props.getLinkedHashMap("possible-values");
+        if (possibleValues == null) {
+            possibleValues = new LinkedHashMap<>();
+        }
+        return Collections.unmodifiableMap(possibleValues);
+    }
+
+    /**
+     * Removes a possible value and its label. Does nothing if the value is not
+     * set.
+     *
+     * @param value The value to remove.
+     */
+    public void removePossibleValue(Value value) {
+        LinkedHashMap<Value, String> possibleValues = props.getLinkedHashMap("possible-values");
+        if (possibleValues != null) {
+            possibleValues.remove(value);
+        }
+    }
+
+    /**
+     * Removes all the possible values, so the column is no longer restricted.
+     */
+    public void clearPossibleValues() {
+        LinkedHashMap<Value, String> possibleValues = props.getLinkedHashMap("possible-values");
+        if (possibleValues != null) {
+            possibleValues.clear();
+        }
+    }
+
+    /**
+     * Adds a possible value without a label.
+     *
+     * @param value The value.
+     * @see #setPossibleValue(Value, String)
+     */
+    public void setPossibleValue(Value value) {
+        setPossibleValue(value, null);
+    }
+
+    /**
+     * Adds a possible value with its label. If the value is already set, its
+     * label is replaced and its position is kept.
+     *
+     * @param value The value.
+     * @param label The label to show for the value, may be null.
+     */
+    public void setPossibleValue(Value value, String label) {
+        LinkedHashMap<Value, String> possibleValues = props.getLinkedHashMap("possible-values");
+        if (possibleValues == null) {
+            possibleValues = new LinkedHashMap<>();
+            props.put("possible-values", possibleValues);
+        }
     }
 
     /**

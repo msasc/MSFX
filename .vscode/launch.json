@@ -1,7 +1,13 @@
 {
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "type": "java",
+            "name": "TestLinkedHashMap",
+            "request": "launch",
+            "mainClass": "ztest.TestLinkedHashMap",
+            "projectName": "msfx_2198cc6b"
+        },
         {
             "type": "java",
             "name": "HelloFx",

@@ -497,7 +497,7 @@ public class Value implements Comparable<Value> {
 	 * @param v The new int value.
 	 * @throws IllegalStateException if the value is not a number.
 	 */
-	public void setInt(int v) {
+	public void setInteger(int v) {
 		if (!isNumber()) {
 			throw new IllegalStateException("Value is not a number");
 		}
