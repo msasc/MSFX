@@ -15,6 +15,8 @@
  */
 package msfx.lib.md;
 
+import java.util.Objects;
+
 import msfx.lib.util.Properties;
 
 /**
