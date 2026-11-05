@@ -115,6 +115,15 @@ public class Column {
     }
 
     /**
+     * @return Whether the column has possible values, that is, whether it is
+     *         restricted to a set of values.
+     */
+    public boolean hasPossibleValues() {
+        LinkedHashMap<Value, String> possibleValues = props.getLinkedHashMap("possible-values");
+        return possibleValues != null && !possibleValues.isEmpty();
+    }
+
+    /**
      * Adds a possible value without a label.
      *
      * @param value The value.
