@@ -88,4 +88,54 @@ public class Column {
         }
         return userProps;
     }
+
+    /**
+     * @return The header of the column, used as table header, or the name if not
+     *         set.
+     */
+    public String getHeader() {
+        return props.getString("header", getName());
+    }
+
+    /**
+     * @param header The header of the column, used as table header.
+     * @throws NullPointerException If the header is null.
+     */
+    public void setHeader(String header) {
+        Objects.requireNonNull(header, "Header can not be null");
+        props.put("header", header);
+    }
+
+    /**
+     * @return The label of the column, used as form label, or the name if not
+     *         set.
+     */
+    public String getLabel() {
+        return props.getString("label", getName());
+    }
+
+    /**
+     * @param label The label of the column, used as form label.
+     * @throws NullPointerException If the label is null.
+     */
+    public void setLabel(String label) {
+        Objects.requireNonNull(label, "Label can not be null");
+        props.put("label", label);
+    }
+
+    /**
+     * @return The description of the column, or the name if not set.
+     */
+    public String getDescription() {
+        return props.getString("description", getName());
+    }
+
+    /**
+     * @param description The description of the column.
+     * @throws NullPointerException If the description is null.
+     */
+    public void setDescription(String description) {
+        Objects.requireNonNull(description, "Description can not be null");
+        props.put("description", description);
+    }
 }
