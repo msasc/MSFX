@@ -70,7 +70,9 @@ public class Maps {
 			// Sets.
 			HashSet.class,
 			LinkedHashSet.class,
-			TreeSet.class);
+			TreeSet.class,
+			// Properties.
+			Properties.class);
 
 	/**
 	 * Checks that the value belongs to the list of accepted classes.
@@ -113,6 +115,7 @@ public class Maps {
 	 * collections ({@link ArrayList}, {@link LinkedList}, {@link HashSet},
 	 * {@link LinkedHashSet}, {@link TreeSet}) are copied into a new instance of the
 	 * same class, recursively. Tree maps and sets keep their comparator.</li>
+	 * <li>{@link Properties} are copied into a new instance, recursively.</li>
 	 * <li>Any other accepted value is assumed immutable (scalars, strings, date and
 	 * time) and is shared, not copied.</li>
 	 * </ul>
@@ -143,6 +146,20 @@ public class Maps {
 	}
 
 	/**
+	 * Returns a deep copy of the properties, accepting only {@link #VALUE_CLASSES}
+	 * as values. Values are copied as described in {@link #deepCopy(Map, Set)}.
+	 *
+	 * @param properties The properties to copy.
+	 * @return The deep copy.
+	 * @throws IllegalArgumentException If any value, at any depth, is null or its
+	 *                                  class is not accepted.
+	 */
+	static Properties copyProperties(Properties properties) {
+		Objects.requireNonNull(properties, "Properties can not be null");
+		return copyProperties(properties, VALUE_CLASSES, new IdentityHashMap<>());
+	}
+
+	/**
 	 * Validates and copies a value.
 	 *
 	 * @param value           The value.
@@ -158,7 +175,32 @@ public class Maps {
 		if (value instanceof Collection<?> collection) {
 			return copyCollection(collection, acceptedClasses, copies);
 		}
+		if (value instanceof Properties properties) {
+			return copyProperties(properties, acceptedClasses, copies);
+		}
 		return value;
+	}
+
+	/**
+	 * Copies a properties object, sharing keys and copying values.
+	 *
+	 * @param properties      The properties.
+	 * @param acceptedClasses The accepted classes.
+	 * @param copies          The containers already copied, original to copy.
+	 * @return The copy.
+	 */
+	private static Properties copyProperties(Properties properties, Set<Class<?>> acceptedClasses, Map<Object, Object> copies) {
+		Properties copy = (Properties) copies.get(properties);
+		if (copy != null) {
+			return copy;
+		}
+		copy = new Properties();
+		// Register before filling, so circular references resolve to this copy.
+		copies.put(properties, copy);
+		for (Map.Entry<Object, Object> entry : properties.map().entrySet()) {
+			copy.map().put(entry.getKey(), copyValue(entry.getValue(), acceptedClasses, copies));
+		}
+		return copy;
 	}
 
 	/**

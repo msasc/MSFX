@@ -286,7 +286,7 @@ public class JSONParser {
 				case BINARY -> new JSONEntry(HexFormat.of().parseHex(str));
 				case DATE -> new JSONEntry(LocalDate.parse(str));
 				case TIME -> new JSONEntry(LocalTime.parse(str));
-				case TIMESTAMP -> new JSONEntry(LocalDateTime.parse(str));
+				case DATETIME -> new JSONEntry(LocalDateTime.parse(str));
 				default -> null;
 			};
 		} catch (IllegalArgumentException | DateTimeParseException exc) {

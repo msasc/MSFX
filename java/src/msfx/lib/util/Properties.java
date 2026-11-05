@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -63,9 +64,14 @@ public class Properties {
 	 * @return A deep copy of this properties object.
 	 */
 	public Properties copy() {
-		Properties copy = new Properties();
-		copy.props.putAll(Maps.deepCopy(props, Maps.VALUE_CLASSES));
-		return copy;
+		return Maps.copyProperties(this);
+	}
+
+	/**
+	 * @return The internal property map, for use by {@link Maps} when copying.
+	 */
+	Map<Object, Object> map() {
+		return props;
 	}
 
 	/**
@@ -83,6 +89,24 @@ public class Properties {
 	 */
 	public Object remove(Object key) {
 		return props.remove(key);
+	}
+
+	/**
+	 * @param <T>   The value type.
+	 * @param key   The key.
+	 * @param clazz The expected class of the value.
+	 * @return The value associated with the key, or null if not found.
+	 * @throws NullPointerException     If the class is null.
+	 * @throws IllegalArgumentException If the value is not an instance of the
+	 *                                  class.
+	 */
+	public <T> T getObject(Object key, Class<T> clazz) {
+		Objects.requireNonNull(clazz, "Class can not be null");
+		Object value = props.get(key);
+		if (value == null || clazz.isInstance(value)) {
+			return clazz.cast(value);
+		}
+		throw new IllegalArgumentException("Value is not a " + clazz.getSimpleName() + ": " + value);
 	}
 
 	/**
@@ -530,5 +554,18 @@ public class Properties {
 			return (TreeSet<E>) value;
 		}
 		throw new IllegalArgumentException("Value is not a TreeSet: " + value);
+	}
+
+	/**
+	 * @param key The key.
+	 * @return The Properties value associated with the key, or null if not found.
+	 * @throws IllegalArgumentException If the value is not a Properties.
+	 */
+	public Properties getProperties(Object key) {
+		Object value = props.get(key);
+		if (value == null || value instanceof Properties) {
+			return (Properties) value;
+		}
+		throw new IllegalArgumentException("Value is not a Properties: " + value);
 	}
 }

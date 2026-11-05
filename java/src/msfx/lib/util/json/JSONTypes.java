@@ -65,15 +65,15 @@ public enum JSONTypes {
 	 */
 	TIME("%tm%"),
 	/**
-	 * Extended timestamp (date-time) type.
+	 * Extended date-time type. Keeps the "%ts%" key for compatibility with stored JSON.
 	 */
-	TIMESTAMP("%ts%");
+	DATETIME("%ts%");
 
 	/**
 	 * Extended types, read-only.
 	 */
 	public static final Set<JSONTypes> EXTENDED_TYPES = Collections.unmodifiableSet(
-			EnumSet.of(BINARY, DATE, TIME, TIMESTAMP));
+			EnumSet.of(BINARY, DATE, TIME, DATETIME));
 
 	/**
 	 * Key to store extended types, null for standard types.

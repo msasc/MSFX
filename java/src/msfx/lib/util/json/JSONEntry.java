@@ -131,7 +131,7 @@ public class JSONEntry {
 	 * @param value A {@link LocalDateTime}, may be null.
 	 */
 	public JSONEntry(LocalDateTime value) {
-		this.type = TIMESTAMP;
+		this.type = DATETIME;
 		this.value = value;
 	}
 
@@ -159,7 +159,7 @@ public class JSONEntry {
 				case BINARY -> value instanceof byte[];
 				case DATE -> value instanceof LocalDate;
 				case TIME -> value instanceof LocalTime;
-				case TIMESTAMP -> value instanceof LocalDateTime;
+				case DATETIME -> value instanceof LocalDateTime;
 			};
 			if (!valid) {
 				throw new IllegalArgumentException("Invalid type " + type + " for " + value.getClass());
@@ -269,8 +269,8 @@ public class JSONEntry {
 	/**
 	 * @return Whether the value is a {@link LocalDateTime}.
 	 */
-	public boolean isTimestamp() {
-		return type == TIMESTAMP;
+	public boolean isDateTime() {
+		return type == DATETIME;
 	}
 
 	/**
@@ -347,10 +347,10 @@ public class JSONEntry {
 
 	/**
 	 * @return The value as a {@link LocalDateTime}, or null.
-	 * @throws IllegalStateException If the value is not a TIMESTAMP.
+	 * @throws IllegalStateException If the value is not a DATETIME.
 	 */
-	public LocalDateTime getTimestamp() {
-		if (type != TIMESTAMP) throw new IllegalStateException("Value is not TIMESTAMP");
+	public LocalDateTime getDateTime() {
+		if (type != DATETIME) throw new IllegalStateException("Value is not DATETIME");
 		return (LocalDateTime) value;
 	}
 

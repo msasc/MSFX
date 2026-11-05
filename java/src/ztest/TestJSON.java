@@ -106,7 +106,7 @@ public class TestJSON {
 		checkEquals("binary type", JSONTypes.BINARY, new JSONEntry(new byte[] { 1 }).getType());
 		checkEquals("date type", JSONTypes.DATE, new JSONEntry(LocalDate.now()).getType());
 		checkEquals("time type", JSONTypes.TIME, new JSONEntry(LocalTime.now()).getType());
-		checkEquals("timestamp type", JSONTypes.TIMESTAMP, new JSONEntry(LocalDateTime.now()).getType());
+		checkEquals("date-time type", JSONTypes.DATETIME, new JSONEntry(LocalDateTime.now()).getType());
 
 		JSONEntry str = new JSONEntry("text");
 		check("isString", str.isString());
@@ -120,7 +120,7 @@ public class TestJSON {
 		checkThrows("getBinary on a string", IllegalStateException.class, str::getBinary);
 		checkThrows("getDate on a string", IllegalStateException.class, str::getDate);
 		checkThrows("getTime on a string", IllegalStateException.class, str::getTime);
-		checkThrows("getTimestamp on a string", IllegalStateException.class, str::getTimestamp);
+		checkThrows("getDateTime on a string", IllegalStateException.class, str::getDateTime);
 		checkThrows("getString on a number", IllegalStateException.class, () -> new JSONEntry(1).getString());
 
 		checkThrows("null string", NullPointerException.class, () -> new JSONEntry((String) null));
@@ -140,7 +140,7 @@ public class TestJSON {
 		check("BINARY is extended", JSONTypes.BINARY.isExtended());
 		check("STRING is not extended", !JSONTypes.STRING.isExtended());
 		checkEquals("fromKey %dt%", JSONTypes.DATE, JSONTypes.fromKey("%dt%"));
-		checkEquals("fromKey %ts%", JSONTypes.TIMESTAMP, JSONTypes.fromKey("%ts%"));
+		checkEquals("fromKey %ts%", JSONTypes.DATETIME, JSONTypes.fromKey("%ts%"));
 		checkEquals("fromKey unknown", null, JSONTypes.fromKey("x"));
 		checkEquals("four extended types", 4, JSONTypes.EXTENDED_TYPES.size());
 		checkThrows("EXTENDED_TYPES is read-only", UnsupportedOperationException.class,
@@ -238,7 +238,7 @@ public class TestJSON {
 		JSONObject back = JSONObject.parse(obj.toString());
 		checkEquals("date parsed", LocalDate.of(2026, 10, 27), back.get("d").getDate());
 		checkEquals("time parsed", LocalTime.of(10, 30, 15, 500_000_000), back.get("t").getTime());
-		checkEquals("timestamp parsed", LocalDateTime.of(2026, 10, 27, 10, 30), back.get("ts").getTimestamp());
+		checkEquals("date-time parsed", LocalDateTime.of(2026, 10, 27, 10, 30), back.get("ts").getDateTime());
 		check("binary parsed", Arrays.equals(new byte[] { 0, 1, 127, (byte) 0x80, (byte) 0xFF },
 				back.get("b").getBinary()));
 
@@ -268,7 +268,7 @@ public class TestJSON {
 		JSONObject nullsBack = JSONObject.parse(nulls.toString());
 		check("null date parsed", nullsBack.get("d").isDate() && nullsBack.get("d").isNullValue());
 		check("null time parsed", nullsBack.get("t").isTime() && nullsBack.get("t").isNullValue());
-		check("null timestamp parsed", nullsBack.get("ts").isTimestamp() && nullsBack.get("ts").isNullValue());
+		check("null date-time parsed", nullsBack.get("ts").isDateTime() && nullsBack.get("ts").isNullValue());
 		check("null binary parsed", nullsBack.get("b").isBinary() && nullsBack.get("b").isNullValue());
 
 		/* Objects that look extended but are not stay plain objects. */
