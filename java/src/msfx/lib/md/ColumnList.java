@@ -35,8 +35,10 @@ import java.util.stream.IntStream;
  * aliases share the same column object, so changing its properties through one
  * alias changes them for all.
  * <p>
- * Aliases are case-sensitive. Indexes follow the order in which the columns
- * were added.
+ * Lookups by alias are case-sensitive. However, an alias that differs from an
+ * existing one only in upper or lower case is rejected, since many databases
+ * would treat both as the same name. Indexes follow the order in which the
+ * columns were added.
  * <p>
  * Columns are expected to be added and removed in an initial step, after which
  * the list remains stable and is mostly read. Every add or remove rebuilds the
@@ -119,8 +121,8 @@ public class ColumnList implements Iterable<Column> {
 	 * @param column The column to add.
 	 * @throws NullPointerException     If the column or its name is null.
 	 * @throws IllegalArgumentException If the name is blank, already exists as an
-	 *                                  alias, or the interceptor rejects the
-	 *                                  column.
+	 *                                  alias ignoring case, or the interceptor
+	 *                                  rejects the column.
 	 */
 	public void add(Column column) {
 		Objects.requireNonNull(column, "Column can not be null");
@@ -133,8 +135,9 @@ public class ColumnList implements Iterable<Column> {
 	 * @param alias  The alias of the column.
 	 * @param column The column to add.
 	 * @throws NullPointerException     If the alias or the column is null.
-	 * @throws IllegalArgumentException If the alias is blank, already exists, or
-	 *                                  the interceptor rejects the column.
+	 * @throws IllegalArgumentException If the alias is blank, already exists
+	 *                                  ignoring case, or the interceptor rejects
+	 *                                  the column.
 	 */
 	public void add(String alias, Column column) {
 		Objects.requireNonNull(alias, "Alias can not be null");
@@ -142,8 +145,14 @@ public class ColumnList implements Iterable<Column> {
 		if (alias.isBlank()) {
 			throw new IllegalArgumentException("Alias can not be blank");
 		}
-		if (columnsByAlias.containsKey(alias)) {
-			throw new IllegalArgumentException("Alias already exists: " + alias);
+		for (String existing : columnsByAlias.keySet()) {
+			if (existing.equals(alias)) {
+				throw new IllegalArgumentException("Alias already exists: " + alias);
+			}
+			if (existing.equalsIgnoreCase(alias)) {
+				throw new IllegalArgumentException(
+						"Alias " + alias + " differs only in case from existing alias " + existing);
+			}
 		}
 		if (interceptor != null) {
 			interceptor.accept(column);
