@@ -114,7 +114,7 @@ public enum Types {
 	 */
 	public boolean isNullable() {
 		return switch (this) {
-			case DATE, TIME, DATETIME, STRING, BINARY, OBJECT -> true;
+			case DATE, TIME, DATETIME, BINARY, OBJECT -> true;
 			default -> false;
 		};
 	}
@@ -176,6 +176,28 @@ public enum Types {
 		throw new IllegalArgumentException("Invalid value for this type: " + this);
 	}
 
+	/**
+	 * Returns the default value of a type, used when a column has no explicit
+	 * default value:
+	 * <ul>
+	 * <li>BOOLEAN: false.</li>
+	 * <li>DECIMAL: zero with the given number of decimals, e.g. 0.00 for 2.</li>
+	 * <li>DOUBLE, INTEGER, LONG: zero.</li>
+	 * <li>STRING: an empty string.</li>
+	 * <li>DATE, TIME, DATETIME, BINARY, OBJECT: a null value of the type.</li>
+	 * </ul>
+	 * Numbers and booleans never default to null, so that they can be defined
+	 * as NOT NULL. The nullable types default to null; for BINARY and OBJECT,
+	 * normally stored as BLOB and CLOB, this avoids initializing large objects
+	 * that have no content. A new value is returned on each call, so it can be
+	 * modified freely.
+	 *
+	 * @param type     The type.
+	 * @param decimals The number of decimals, used only for DECIMAL. Zero or
+	 *                 negative means no decimals.
+	 * @return The default value.
+	 * @throws NullPointerException If the type is null.
+	 */
 	public static Value getDefaultValue(Types type, int decimals) {
 		return switch (type) {
 			case BOOLEAN -> new Value(false);
@@ -187,8 +209,8 @@ public enum Types {
 			case TIME -> new Value((LocalTime) null);
 			case DATETIME -> new Value((LocalDateTime) null);
 			case STRING -> new Value("");
-			case BINARY -> new Value(new byte[0]);
-			case OBJECT -> new Value(new JSONObject());
+			case BINARY -> new Value((byte[]) null);
+			case OBJECT -> new Value((JSONObject) null);
 		};
 	}
 

@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -28,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -61,7 +63,9 @@ public class Properties {
 	}
 
 	/**
-	 * @return A deep copy of this properties object.
+	 * @return A deep copy of this properties object. Values out of
+	 *         {@link Maps#VALUE_CLASSES} are not copied: the copy refers to the
+	 *         same objects.
 	 */
 	public Properties copy() {
 		return Maps.copyProperties(this);
@@ -84,11 +88,38 @@ public class Properties {
 	}
 
 	/**
+	 * Puts a value of any class, including classes out of
+	 * {@link Maps#VALUE_CLASSES}. Read it back with
+	 * {@link #getObject(Object, Class)}.
+	 * <p>
+	 * A value out of {@link Maps#VALUE_CLASSES} is not copied by
+	 * {@link #copy()}: the copy refers to the same object.
+	 *
+	 * @param key   The key.
+	 * @param value The value to associate with the key.
+	 * @throws IllegalArgumentException If the value is null.
+	 */
+	public void putObject(Object key, Object value) {
+		if (value == null) {
+			throw new IllegalArgumentException("Value can not be null");
+		}
+		props.put(key, value);
+	}
+
+	/**
 	 * @param key The key.
 	 * @return The removed value associated with the key, or null if not found.
 	 */
 	public Object remove(Object key) {
 		return props.remove(key);
+	}
+
+	/**
+	 * @return An unmodifiable view of the keys, which reflects later changes to
+	 *         the properties.
+	 */
+	public Set<Object> keys() {
+		return Collections.unmodifiableSet(props.keySet());
 	}
 
 	/**

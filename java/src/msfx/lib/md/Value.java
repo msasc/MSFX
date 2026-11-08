@@ -24,6 +24,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
 
 /**
  * A mutable value for the supported types.
@@ -695,6 +696,29 @@ public class Value implements Comparable<Value> {
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Object is not a Value");
 		}
+	}
+	/**
+	 * Hash code consistent with {@link #equals(Object)}. Numbers are compared as
+	 * doubles, so they hash as doubles: 1, 1L, 1.0 and 1.00 have the same hash.
+	 * Objects are compared by their string form, so they hash by it.
+	 *
+	 * @return The hash code.
+	 */
+	@Override
+	public int hashCode() {
+		if (isNull()) {
+			return 0;
+		}
+		if (isNumber()) {
+			return Double.hashCode(getDouble());
+		}
+		if (isBinary()) {
+			return Arrays.hashCode((byte[]) value);
+		}
+		if (isObject()) {
+			return value.toString().hashCode();
+		}
+		return value.hashCode();
 	}
 	/**
 	 * @param v The boolean value to compare to.

@@ -91,15 +91,14 @@ public class Maps {
 	}
 
 	/**
-	 * Returns a deep copy of the map, accepting only {@link #VALUE_CLASSES} as
-	 * values.
+	 * Returns a deep copy of the map, copying the {@link #VALUE_CLASSES} as
+	 * described in {@link #deepCopy(Map, Set)}.
 	 *
 	 * @param <K> The key type.
 	 * @param <V> The value type.
 	 * @param map The map to copy.
 	 * @return The deep copy.
-	 * @throws IllegalArgumentException If any value, at any depth, is null or its
-	 *                                  class is not accepted.
+	 * @throws IllegalArgumentException If any value, at any depth, is null.
 	 * @see #deepCopy(Map, Set)
 	 */
 	public static <K, V> Map<K, V> deepCopy(Map<K, V> map) {
@@ -107,7 +106,7 @@ public class Maps {
 	}
 
 	/**
-	 * Returns a deep copy of the map, accepting only the given classes as values.
+	 * Returns a deep copy of the map, copying the values of the given classes.
 	 * <p>
 	 * How each value is copied:
 	 * <ul>
@@ -118,6 +117,9 @@ public class Maps {
 	 * <li>{@link Properties} are copied into a new instance, recursively.</li>
 	 * <li>Any other accepted value is assumed immutable (scalars, strings, date and
 	 * time) and is shared, not copied.</li>
+	 * <li>Values of classes not accepted, such as those stored with
+	 * {@link Properties#putObject(Object, Object)}, are shared as is, not
+	 * copied.</li>
 	 * </ul>
 	 * Map keys are shared, not copied, since keys should be immutable.
 	 * <p>
@@ -131,12 +133,12 @@ public class Maps {
 	 * @param <K>             The key type.
 	 * @param <V>             The value type.
 	 * @param map             The map to copy.
-	 * @param acceptedClasses The classes accepted as values, matched by exact
-	 *                        class.
+	 * @param acceptedClasses The classes whose values are copied, matched by
+	 *                        exact class.
 	 * @return The deep copy.
-	 * @throws IllegalArgumentException If any value, at any depth, is null or its
-	 *                                  class is not accepted, or if an accepted
-	 *                                  map or collection class can not be copied.
+	 * @throws IllegalArgumentException If any value, at any depth, is null, or if
+	 *                                  an accepted map or collection class can
+	 *                                  not be copied.
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K, V> Map<K, V> deepCopy(Map<K, V> map, Set<Class<?>> acceptedClasses) {
@@ -146,13 +148,12 @@ public class Maps {
 	}
 
 	/**
-	 * Returns a deep copy of the properties, accepting only {@link #VALUE_CLASSES}
-	 * as values. Values are copied as described in {@link #deepCopy(Map, Set)}.
+	 * Returns a deep copy of the properties, copying the {@link #VALUE_CLASSES}.
+	 * Values are copied as described in {@link #deepCopy(Map, Set)}.
 	 *
 	 * @param properties The properties to copy.
 	 * @return The deep copy.
-	 * @throws IllegalArgumentException If any value, at any depth, is null or its
-	 *                                  class is not accepted.
+	 * @throws IllegalArgumentException If any value, at any depth, is null.
 	 */
 	static Properties copyProperties(Properties properties) {
 		Objects.requireNonNull(properties, "Properties can not be null");
@@ -160,15 +161,22 @@ public class Maps {
 	}
 
 	/**
-	 * Validates and copies a value.
+	 * Copies a value.
 	 *
 	 * @param value           The value.
-	 * @param acceptedClasses The accepted classes.
+	 * @param acceptedClasses The classes whose values are copied.
 	 * @param copies          The containers already copied, original to copy.
-	 * @return The copy, or the value itself if it is immutable.
+	 * @return The copy, or the value itself if it is immutable or its class is
+	 *         not accepted.
+	 * @throws IllegalArgumentException If the value is null.
 	 */
 	private static Object copyValue(Object value, Set<Class<?>> acceptedClasses, Map<Object, Object> copies) {
-		validateValue(value, acceptedClasses);
+		if (value == null) {
+			throw new IllegalArgumentException("Value can not be null");
+		}
+		if (!acceptedClasses.contains(value.getClass())) {
+			return value;
+		}
 		if (value instanceof Map<?, ?> map) {
 			return copyMap(map, acceptedClasses, copies);
 		}

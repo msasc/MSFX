@@ -40,9 +40,9 @@ import java.util.stream.IntStream;
  * would treat both as the same name. Indexes follow the order in which the
  * columns were added.
  * <p>
- * Columns are expected to be added and removed in an initial step, after which
- * the list remains stable and is mostly read. Every add or remove rebuilds the
- * internal structures, so that access by alias or by index is direct.
+ * Columns are added in an initial step, after which the list remains stable
+ * and is mostly read. Every add rebuilds the internal structures, so that
+ * access by alias or by index is direct.
  *
  * @author Miquel Sas
  */
@@ -53,13 +53,16 @@ public class ColumnList implements Iterable<Column> {
 	 * it.
 	 */
 	@FunctionalInterface
-	public interface AddColumnInterceptor {
+	public interface Interceptor {
 		/**
+		 * @param alias  The alias the column is about to be added under.
 		 * @param column The column about to be added.
-		 * @throws IllegalArgumentException To reject the column, which is then not
-		 *                                  added.
+		 * @throws RuntimeException Any exception rejects the column, which is then
+		 *                          not added. Use IllegalArgumentException for an
+		 *                          invalid column and IllegalStateException when no
+		 *                          column can be added in the current state.
 		 */
-		void accept(Column column);
+		void accept(String alias, Column column);
 	}
 
 	/**
@@ -97,9 +100,9 @@ public class ColumnList implements Iterable<Column> {
 	 */
 	private List<String> aliasList = List.of();
 	/**
-	 * Add column interceptor, may be null.
+	 * Column interceptor, may be null.
 	 */
-	private AddColumnInterceptor interceptor = null;
+	private Interceptor interceptor = null;
 
 	/**
 	 * Constructor.
@@ -111,7 +114,7 @@ public class ColumnList implements Iterable<Column> {
 	 * @param interceptor The interceptor called before each column is added, to
 	 *                    configure its properties or to reject it. May be null.
 	 */
-	public void setInterceptor(AddColumnInterceptor interceptor) {
+	public void setInterceptor(Interceptor interceptor) {
 		this.interceptor = interceptor;
 	}
 
@@ -155,7 +158,7 @@ public class ColumnList implements Iterable<Column> {
 			}
 		}
 		if (interceptor != null) {
-			interceptor.accept(column);
+			interceptor.accept(alias, column);
 		}
 		columnsByAlias.put(alias, column);
 		rebuildInternals();
@@ -191,7 +194,7 @@ public class ColumnList implements Iterable<Column> {
 	 * @param alias The alias.
 	 * @return The index of the column with the alias, or -1 if not found.
 	 */
-	public int getIndex(String alias) {
+	public int indexOf(String alias) {
 		Integer index = indexesByAlias.get(alias);
 		return index == null ? -1 : index;
 	}
@@ -209,7 +212,7 @@ public class ColumnList implements Iterable<Column> {
 	 *         under several aliases appears once per alias.
 	 */
 	public List<Column> columns() {
-		return columnList;
+		return Collections.unmodifiableList(columnList);
 	}
 
 	/**
@@ -239,43 +242,6 @@ public class ColumnList implements Iterable<Column> {
 	 */
 	public boolean isEmpty() {
 		return columnsByIndex.length == 0;
-	}
-
-	/**
-	 * Removes the column at an index. The columns after it move down one
-	 * position.
-	 *
-	 * @param index The index.
-	 * @return The removed column.
-	 * @throws IndexOutOfBoundsException If the index is out of range.
-	 */
-	public Column remove(int index) {
-		Column column = columnsByAlias.remove(aliasesByIndex[index]);
-		rebuildInternals();
-		return column;
-	}
-
-	/**
-	 * Removes the column with an alias. The columns after it move down one
-	 * position.
-	 *
-	 * @param alias The alias.
-	 * @return The removed column, or null if not found.
-	 */
-	public Column remove(String alias) {
-		Column column = columnsByAlias.remove(alias);
-		if (column != null) {
-			rebuildInternals();
-		}
-		return column;
-	}
-
-	/**
-	 * Removes all the columns.
-	 */
-	public void clear() {
-		columnsByAlias.clear();
-		rebuildInternals();
 	}
 
 	/**
