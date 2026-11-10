@@ -5,10 +5,22 @@
     ],
     // Where compiled .class files go
     "java.project.outputPath": "java/bin",
-    // Libraries the editor should know about: the JavaFX jars
-    "java.project.referencedLibraries": [
-        "java/lib/javafx/lib/*.jar"
-    ],
+    // Libraries on the classpath: the JavaFX jars and the JDBC drivers. The drivers
+    // are found at runtime by DriverManager, the adapters do not reference them.
+    // Sources and javadoc jars are not libraries, the sources are attached.
+    "java.project.referencedLibraries": {
+        "include": [
+            "java/lib/javafx/lib/*.jar",
+            "java/lib/drivers/*.jar"
+        ],
+        "exclude": [
+            "java/lib/drivers/*-sources.jar",
+            "java/lib/drivers/*-javadoc.jar"
+        ],
+        "sources": {
+            "java/lib/drivers/mssql-jdbc-13.6.2.jre11.jar": "java/lib/drivers/mssql-jdbc-13.6.2.jre11-sources.jar"
+        }
+    },
     // License header inserted at the top of every new Java file
     "java.templates.fileHeader": [
         "/*",

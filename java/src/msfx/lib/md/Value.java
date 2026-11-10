@@ -17,6 +17,8 @@
 package msfx.lib.md;
 
 import msfx.lib.util.Binaries;
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
 import msfx.lib.util.json.JSONObject;
 
 import java.math.BigDecimal;
@@ -31,7 +33,7 @@ import java.util.Arrays;
  *
  * @author Miquel Sas
  */
-public class Value implements Comparable<Value> {
+public class Value implements Comparable<Value>, Copyable<Value> {
 	/**
 	 * The value.
 	 */
@@ -157,6 +159,38 @@ public class Value implements Comparable<Value> {
 		value = v;
 		type = Types.OBJECT;
 		modified = false;
+	}
+
+	/**
+	 * Empty value of a type, to be filled by {@link #copy(Copier)}.
+	 *
+	 * @param type The type.
+	 */
+	private Value(Types type) {
+		this.type = type;
+		modified = false;
+	}
+
+	/**
+	 * Copies the value for a fresh new use: the copy is not modified. Binaries
+	 * are cloned and JSON objects deeply copied, the other contents are
+	 * immutable and shared.
+	 *
+	 * @param copier The copier of the copy operation.
+	 * @return The copy.
+	 */
+	@Override
+	public Value copy(Copier copier) {
+		Value copy = new Value(type);
+		copier.register(this, copy);
+		if (value instanceof byte[] bytes) {
+			copy.value = bytes.clone();
+		} else if (value instanceof JSONObject json) {
+			copy.value = copier.copy(json);
+		} else {
+			copy.value = value;
+		}
+		return copy;
 	}
 
 	/**
@@ -348,7 +382,7 @@ public class Value implements Comparable<Value> {
 			return (int) (long) value;
 		}
 		if (isInteger()) {
-			return (int) (int) value;
+			return (int) value;
 		}
 		throw new IllegalStateException("Should never happen");
 	}
@@ -615,15 +649,7 @@ public class Value implements Comparable<Value> {
 		}
 
 		// Check comparable
-		boolean comparable = (isBoolean() && v.isBoolean());
-		comparable |= (isNumber() && v.isNumber());
-		comparable |= (isDate() && v.isDate());
-		comparable |= (isTime() && v.isTime());
-		comparable |= (isDateTime() && v.isDateTime());
-		comparable |= (isString() && v.isString());
-		comparable |= (isBinary() && v.isBinary());
-		comparable |= (isObject() && v.isObject());
-		if (!comparable) {
+		if (!isComparable(v)) {
 			throw new IllegalArgumentException("Values are not comparable");
 		}
 
@@ -645,9 +671,7 @@ public class Value implements Comparable<Value> {
 
 		// Number
 		if (isNumber() && v.isNumber()) {
-			double d1 = getDouble();
-			double d2 = v.getDouble();
-			return Double.compare(d1, d2);
+			return compareNumbers(v);
 		}
 
 		// Date
@@ -685,22 +709,72 @@ public class Value implements Comparable<Value> {
 	}
 
 	/**
+	 * @param v The other value, not null.
+	 * @return Whether both values can be compared: both numbers, or both of the
+	 *         same non numeric type.
+	 */
+	private boolean isComparable(Value v) {
+		if (isNumber() && v.isNumber()) {
+			return true;
+		}
+		return type == v.type;
+	}
+
+	/**
+	 * Compares two numbers by their mathematical value, whatever their types:
+	 * 1, 1L, 1.0 and 1.00 are equal. A double is taken by its shortest decimal
+	 * form, as {@link #getDecimal()} does, so 0.1 as a double equals 0.1 as a
+	 * decimal. NaN and the infinities, only possible in doubles, follow
+	 * {@link Double#compare(double, double)}: NaN is greater than any number,
+	 * and NaN equals NaN.
+	 *
+	 * @param v The other number, not null.
+	 * @return A negative integer, zero, or a positive integer as this number is
+	 *         less than, equal to, or greater than the other.
+	 */
+	private int compareNumbers(Value v) {
+		/* Integers and longs, the most common case, without creating decimals. */
+		if ((isInteger() || isLong()) && (v.isInteger() || v.isLong())) {
+			return Long.compare(getLong(), v.getLong());
+		}
+		boolean special = isDouble() && !Double.isFinite((double) value);
+		boolean otherSpecial = v.isDouble() && !Double.isFinite((double) v.value);
+		if (special || otherSpecial) {
+			if (special && otherSpecial) {
+				return Double.compare((double) value, (double) v.value);
+			}
+			/* Only one is NaN or infinite: NaN and +infinity are greater, -infinity less. */
+			double d = special ? (double) value : (double) v.value;
+			int sign = d == Double.NEGATIVE_INFINITY ? -1 : 1;
+			return special ? sign : -sign;
+		}
+		return getDecimal().compareTo(v.getDecimal());
+	}
+
+	/**
+	 * Two values are equal if they are comparable and compare as equal, see
+	 * {@link #compareTo(Value)}. Numbers are equal if they are the same
+	 * mathematical number, whatever their types: 1, 1L, 1.0 and 1.00 are equal.
+	 *
 	 * @param o The object to compare to.
-	 * @return True if the values are equal, false otherwise.
-	 * @throws IllegalArgumentException if the object is not a Value.
+	 * @return True if the object is an equal value, false otherwise, also if it
+	 *         is null, not a value, or a value not comparable with this one.
 	 */
 	@Override
 	public boolean equals(Object o) {
-		try {
-			return (compareTo((Value) o) == 0);
-		} catch (Exception e) {
-			throw new IllegalArgumentException("Object is not a Value");
+		if (this == o) {
+			return true;
 		}
+		if (!(o instanceof Value v) || !isComparable(v)) {
+			return false;
+		}
+		return compareTo(v) == 0;
 	}
 	/**
-	 * Hash code consistent with {@link #equals(Object)}. Numbers are compared as
-	 * doubles, so they hash as doubles: 1, 1L, 1.0 and 1.00 have the same hash.
-	 * Objects are compared by their string form, so they hash by it.
+	 * Hash code consistent with {@link #equals(Object)}. Numbers hash by their
+	 * value as a double, which is the same for equal numbers of any type: 1, 1L,
+	 * 1.0 and 1.00 have the same hash. Objects are compared by their string
+	 * form, so they hash by it.
 	 *
 	 * @return The hash code.
 	 */
@@ -710,7 +784,9 @@ public class Value implements Comparable<Value> {
 			return 0;
 		}
 		if (isNumber()) {
-			return Double.hashCode(getDouble());
+			double d = getDouble();
+			/* -0.0 equals 0.0 as a number, so it must hash the same. */
+			return Double.hashCode(d == 0.0 ? 0.0 : d);
 		}
 		if (isBinary()) {
 			return Arrays.hashCode((byte[]) value);

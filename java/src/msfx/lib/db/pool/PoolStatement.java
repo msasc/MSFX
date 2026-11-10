@@ -22,11 +22,28 @@ import msfx.lib.db.DBStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * Pool statement, a thin wrapper over the JDBC statement created through a
+ * {@link PoolConnection}. It is closed when closed directly or when its
+ * connection is closed.
+ *
+ * @author Miquel Sas
+ */
 class PoolStatement implements DBStatement {
 
-	PoolConnection cn;
-	Statement st;
+	/**
+	 * The connection that created the statement, informed when it is closed.
+	 */
+	private final PoolConnection cn;
+	/**
+	 * Internal JDBC statement.
+	 */
+	private final Statement st;
 
+	/**
+	 * @param cn The connection that created the statement.
+	 * @param st The JDBC statement to wrap.
+	 */
 	PoolStatement(PoolConnection cn, Statement st) {
 		this.cn = cn;
 		this.st = st;

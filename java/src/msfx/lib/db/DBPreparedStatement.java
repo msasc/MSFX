@@ -16,22 +16,28 @@
 
 package msfx.lib.db;
 
+import msfx.lib.md.Types;
+
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.sql.Date;
 import java.sql.SQLException;
-import java.sql.Time;
-import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 /**
  * A simplified JDBC prepared statement with just the methods needed by MSFX.
  * <p>
  * The SQL command is given when the statement is prepared, with a ? for each
  * parameter. Parameters are set by index, starting at 1, with one setter per
- * type of {@link msfx.lib.md.Types}, and keep their values until set again, so
- * the statement can be executed or added to the batch many times setting only
- * the parameters that change.
+ * type of {@link msfx.lib.md.Types}, named and typed as in
+ * {@link msfx.lib.md.Value}, and keep their values until set again, so the
+ * statement can be executed or added to the batch many times setting only the
+ * parameters that change.
+ * <p>
+ * Setters of object values accept null, which sets the parameter to SQL NULL,
+ * the same as {@link #setNull(int, Types)}.
  *
  * @author Miquel Sas
  */
@@ -47,10 +53,10 @@ public interface DBPreparedStatement extends DBStatementBase {
 	/**
 	 * DECIMAL.
 	 * @param index The parameter index, starting at 1.
-	 * @param x     The value.
+	 * @param x     The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	void setBigDecimal(int index, BigDecimal x) throws SQLException;
+	void setDecimal(int index, BigDecimal x) throws SQLException;
 	/**
 	 * DOUBLE.
 	 * @param index The parameter index, starting at 1.
@@ -76,36 +82,36 @@ public interface DBPreparedStatement extends DBStatementBase {
 	/**
 	 * DATE.
 	 * @param index The parameter index, starting at 1.
-	 * @param x     The value.
+	 * @param x     The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	void setDate(int index, Date x) throws SQLException;
+	void setDate(int index, LocalDate x) throws SQLException;
 	/**
 	 * TIME.
 	 * @param index The parameter index, starting at 1.
-	 * @param x     The value.
+	 * @param x     The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	void setTime(int index, Time x) throws SQLException;
+	void setTime(int index, LocalTime x) throws SQLException;
 	/**
 	 * DATETIME.
 	 * @param index The parameter index, starting at 1.
-	 * @param x     The value.
+	 * @param x     The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	void setTimestamp(int index, Timestamp x) throws SQLException;
+	void setDateTime(int index, LocalDateTime x) throws SQLException;
 
 	/**
 	 * STRING, and OBJECT as JSON text.
 	 * @param index The parameter index, starting at 1.
-	 * @param x     The value.
+	 * @param x     The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
 	void setString(int index, String x) throws SQLException;
 	/**
 	 * STRING or OBJECT stored as CLOB, written from a stream.
 	 * @param index  The parameter index, starting at 1.
-	 * @param reader The reader with the value, read until its end.
+	 * @param reader The reader with the value, read until its end, or null.
 	 * @throws SQLException If an error occurs.
 	 */
 	void setClob(int index, Reader reader) throws SQLException;
@@ -113,17 +119,26 @@ public interface DBPreparedStatement extends DBStatementBase {
 	/**
 	 * BINARY.
 	 * @param index The parameter index, starting at 1.
-	 * @param x     The value.
+	 * @param x     The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	void setBytes(int index, byte[] x) throws SQLException;
+	void setBinary(int index, byte[] x) throws SQLException;
 	/**
 	 * BINARY stored as BLOB, written from a stream.
 	 * @param index       The parameter index, starting at 1.
-	 * @param inputStream The input stream with the value, read until its end.
+	 * @param inputStream The input stream with the value, read until its end,
+	 *                    or null.
 	 * @throws SQLException If an error occurs.
 	 */
 	void setBlob(int index, InputStream inputStream) throws SQLException;
+
+	/**
+	 * Sets a parameter to SQL NULL, for any type.
+	 * @param index The parameter index, starting at 1.
+	 * @param type  The type of the column the parameter refers to.
+	 * @throws SQLException If an error occurs.
+	 */
+	void setNull(int index, Types type) throws SQLException;
 
 	/**
 	 * Adds the current parameter values to the batch, to be executed with

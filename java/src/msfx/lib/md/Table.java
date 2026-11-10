@@ -20,6 +20,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
 import msfx.lib.util.Properties;
 
 /**
@@ -39,7 +41,7 @@ import msfx.lib.util.Properties;
  *
  * @author Miquel Sas
  */
-public class Table {
+public class Table implements Copyable<Table> {
     /**
      * The columns of the table.
      */
@@ -50,13 +52,43 @@ public class Table {
     private final Properties props = new Properties();
 
     /**
+     * Empty table, to be filled by {@link #copy(Copier)}.
+     */
+    private Table() {
+        columns.setInterceptor((alias, column) -> intercept(alias, column));
+    }
+
+    /**
      * @param name The name of the table.
      * @throws NullPointerException If the name is null.
      */
     public Table(String name) {
+        this();
         Objects.requireNonNull(name, "Name can not be null");
         props.put("name", name);
-        columns.setInterceptor((alias, column) -> intercept(alias, column));
+    }
+
+    /**
+     * Copies the table with its columns, primary key, indexes, foreign keys and
+     * all its properties. The copies of the indexes and foreign keys refer to
+     * the copies of the columns. The foreign tables of the foreign keys are not
+     * copied, they are shared, except when the foreign table is this table.
+     *
+     * @param copier The copier of the copy operation.
+     * @return The copy.
+     */
+    @Override
+    public Table copy(Copier copier) {
+        Table copy = new Table();
+        copier.register(this, copy);
+        /* The columns first, so the indexes and foreign keys resolve to their copies. */
+        for (Column column : columns) {
+            copy.columns.add(copier.copy(column));
+        }
+        for (Object key : props.keys()) {
+            copy.props.putObject(key, copier.copy(props.getObject(key, Object.class)));
+        }
+        return copy;
     }
 
     /**
@@ -64,6 +96,23 @@ public class Table {
      */
     public String getName() {
         return props.getString("name");
+    }
+
+    /**
+     * @return The schema of the table, or null if not set. It is not set when
+     *         the table is defined, but when it is accessed through the catalog.
+     */
+    public String getSchema() {
+        return props.getString("schema", null);
+    }
+
+    /**
+     * @param schema The schema of the table.
+     * @throws NullPointerException If the schema is null.
+     */
+    public void setSchema(String schema) {
+        Objects.requireNonNull(schema, "Schema can not be null");
+        props.put("schema", schema);
     }
 
     /**
@@ -86,12 +135,22 @@ public class Table {
      */
     private void intercept(String alias, Column column) {
         if (!alias.equals(column.getName())) {
-            throw new IllegalArgumentException("Column " + column.getName() + " can not be added to table "
-                    + getName() + " under a different alias: " + alias);
+            StringBuilder msg = new StringBuilder();
+            msg.append("Column ");
+            msg.append(column.getName());
+            msg.append(" can not be added to table ");
+            msg.append(getName());
+            msg.append(" under a different alias: ");
+            msg.append(alias);
+            throw new IllegalArgumentException(msg.toString());
         }
         if (column.getTable() != null) {
-            throw new IllegalArgumentException(
-                    "Column " + column.getName() + " already belongs to table " + column.getTable().getName());
+            StringBuilder msg = new StringBuilder();
+            msg.append("Column ");
+            msg.append(column.getName());
+            msg.append(" already belongs to table ");
+            msg.append(column.getTable().getName());
+            throw new IllegalArgumentException(msg.toString());
         }
         column.setTable(this);
     }
@@ -121,12 +180,23 @@ public class Table {
         if (index == current) {
             return;
         }
-        String name = index.getName() != null ? index.getName() : getName() + "_PK";
+        String name = index.getName();
+        if (name == null) {
+            StringBuilder pkName = new StringBuilder();
+            pkName.append(getName());
+            pkName.append("_PK");
+            name = pkName.toString();
+        }
         validateIndex(index, name, current);
         for (Column column : index.getColumns()) {
             if (column.isNullable()) {
-                throw new IllegalArgumentException(
-                        "Column " + column.getName() + " of the primary key of table " + getName() + " is nullable");
+                StringBuilder msg = new StringBuilder();
+                msg.append("Column ");
+                msg.append(column.getName());
+                msg.append(" of the primary key of table ");
+                msg.append(getName());
+                msg.append(" is nullable");
+                throw new IllegalArgumentException(msg.toString());
             }
         }
         if (index.getName() == null) {
@@ -196,23 +266,41 @@ public class Table {
      */
     private void validateIndex(Index index, String name, Index replaced) {
         if (index.getTable() != this) {
-            throw new IllegalArgumentException(
-                    "Index " + name + " belongs to table " + index.getTable().getName() + ", not to " + getName());
+            StringBuilder msg = new StringBuilder();
+            msg.append("Index ");
+            msg.append(name);
+            msg.append(" belongs to table ");
+            msg.append(index.getTable().getName());
+            msg.append(", not to ");
+            msg.append(getName());
+            throw new IllegalArgumentException(msg.toString());
         }
         if (index.size() == 0) {
-            throw new IllegalArgumentException("Index " + name + " has no columns");
+            StringBuilder msg = new StringBuilder();
+            msg.append("Index ");
+            msg.append(name);
+            msg.append(" has no columns");
+            throw new IllegalArgumentException(msg.toString());
         }
         for (Index other : getAllIndexes()) {
             if (other == replaced) {
                 continue;
             }
             if (other.getName().equalsIgnoreCase(name)) {
-                throw new IllegalArgumentException(
-                        "Index name " + name + " is already used by index " + other.getName());
+                StringBuilder msg = new StringBuilder();
+                msg.append("Index name ");
+                msg.append(name);
+                msg.append(" is already used by index ");
+                msg.append(other.getName());
+                throw new IllegalArgumentException(msg.toString());
             }
             if (other.getColumns().equals(index.getColumns())) {
-                throw new IllegalArgumentException(
-                        "Index " + name + " has the same columns as index " + other.getName());
+                StringBuilder msg = new StringBuilder();
+                msg.append("Index ");
+                msg.append(name);
+                msg.append(" has the same columns as index ");
+                msg.append(other.getName());
+                throw new IllegalArgumentException(msg.toString());
             }
         }
     }
@@ -224,7 +312,11 @@ public class Table {
     private String nextSecondaryName() {
         int n = getIndexes().size() + 1;
         while (true) {
-            String name = getName() + "_SK" + n;
+            StringBuilder skName = new StringBuilder();
+            skName.append(getName());
+            skName.append("_SK");
+            skName.append(n);
+            String name = skName.toString();
             boolean used = false;
             for (Index index : getAllIndexes()) {
                 if (index.getName().equalsIgnoreCase(name)) {
@@ -264,8 +356,12 @@ public class Table {
     public void addForeignKey(ForeignKey foreignKey) {
         Objects.requireNonNull(foreignKey, "Foreign key can not be null");
         if (foreignKey.getLocalTable() != this) {
-            throw new IllegalArgumentException("The local table of the foreign key is "
-                    + foreignKey.getLocalTable().getName() + ", not " + getName());
+            StringBuilder msg = new StringBuilder();
+            msg.append("The local table of the foreign key is ");
+            msg.append(foreignKey.getLocalTable().getName());
+            msg.append(", not ");
+            msg.append(getName());
+            throw new IllegalArgumentException(msg.toString());
         }
         ArrayList<ForeignKey> foreignKeys = props.getArrayList("foreign-keys");
         if (foreignKeys == null) {

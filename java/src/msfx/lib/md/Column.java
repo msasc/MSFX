@@ -21,6 +21,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
 import msfx.lib.util.Properties;
 
 /**
@@ -40,11 +42,17 @@ import msfx.lib.util.Properties;
  *
  * @author Miquel Sas
  */
-public class Column {
+public class Column implements Copyable<Column> {
     /**
      * Container for the column properties.
      */
     private final Properties props = new Properties();
+
+    /**
+     * Empty column, to be filled by {@link #copy(Copier)}.
+     */
+    private Column() {
+    }
 
     /**
      * @param name     The name of the column.
@@ -59,6 +67,39 @@ public class Column {
         props.put("name", name);
         props.put("length", length);
         props.put("decimals", decimals);
+    }
+
+    /**
+     * Creates a column from a domain, copying its name, type, length, decimals,
+     * and the header, label, description, default value and possible values set
+     * in the domain. They can be changed afterwards in the column without
+     * affecting the domain.
+     *
+     * @param domain The domain.
+     * @throws NullPointerException If the domain is null.
+     */
+    public Column(Domain domain) {
+        Objects.requireNonNull(domain, "Domain can not be null");
+        props.putObject("type", domain.getType());
+        props.put("name", domain.getName());
+        props.put("length", domain.getLength());
+        props.put("decimals", domain.getDecimals());
+        if (domain.getHeader() != null) {
+            props.put("header", domain.getHeader());
+        }
+        if (domain.getLabel() != null) {
+            props.put("label", domain.getLabel());
+        }
+        if (domain.getDescription() != null) {
+            props.put("description", domain.getDescription());
+        }
+        /* Already checked by the domain, with the same type, length, decimals and nullable. */
+        if (domain.hasPossibleValues()) {
+            props.put("possible-values", new LinkedHashMap<>(domain.getPossibleValues()));
+        }
+        if (domain.getDefaultValue() != null) {
+            props.putObject("default-value", domain.getDefaultValue());
+        }
     }
 
     /**
@@ -106,16 +147,30 @@ public class Column {
     public void setNullable(boolean nullable) {
         Types type = getType();
         if (nullable && !type.isNullable()) {
-            throw new IllegalArgumentException("Column " + getName() + " of type " + type + " can not be nullable");
+            StringBuilder msg = new StringBuilder();
+            msg.append("Column ");
+            msg.append(getName());
+            msg.append(" of type ");
+            msg.append(type);
+            msg.append(" can not be nullable");
+            throw new IllegalArgumentException(msg.toString());
         }
         if (!nullable) {
             Value defaultValue = getExplicitDefaultValue();
             if (defaultValue != null && defaultValue.isNull()) {
-                throw new IllegalArgumentException("Column " + getName() + " has a null default value");
+                StringBuilder msg = new StringBuilder();
+                msg.append("Column ");
+                msg.append(getName());
+                msg.append(" has a null default value");
+                throw new IllegalArgumentException(msg.toString());
             }
             for (Value value : getPossibleValues().keySet()) {
                 if (value.isNull()) {
-                    throw new IllegalArgumentException("Column " + getName() + " has a null possible value");
+                    StringBuilder msg = new StringBuilder();
+                    msg.append("Column ");
+                    msg.append(getName());
+                    msg.append(" has a null possible value");
+                    throw new IllegalArgumentException(msg.toString());
                 }
             }
         }
@@ -161,8 +216,12 @@ public class Column {
     public void setDefaultValue(Value defaultValue) {
         Value value = validateValue(defaultValue, "Default value");
         if (hasPossibleValues() && !getPossibleValues().containsKey(value)) {
-            throw new IllegalArgumentException(
-                    "Default value " + value + " is not a possible value of column " + getName());
+            StringBuilder msg = new StringBuilder();
+            msg.append("Default value ");
+            msg.append(value);
+            msg.append(" is not a possible value of column ");
+            msg.append(getName());
+            throw new IllegalArgumentException(msg.toString());
         }
         props.putObject("default-value", value);
     }
@@ -215,8 +274,12 @@ public class Column {
         Value accepted = getType().accept(value);
         Value defaultValue = getExplicitDefaultValue();
         if (defaultValue != null && defaultValue.equals(accepted)) {
-            throw new IllegalStateException(
-                    "Possible value " + accepted + " is the default value of column " + getName());
+            StringBuilder msg = new StringBuilder();
+            msg.append("Possible value ");
+            msg.append(accepted);
+            msg.append(" is the default value of column ");
+            msg.append(getName());
+            throw new IllegalStateException(msg.toString());
         }
         LinkedHashMap<Value, String> possibleValues = props.getLinkedHashMap("possible-values");
         if (possibleValues != null) {
@@ -276,8 +339,13 @@ public class Column {
         /* Restricting the column would leave the explicit default out. */
         Value defaultValue = getExplicitDefaultValue();
         if (possibleValues.isEmpty() && defaultValue != null && !defaultValue.equals(accepted)) {
-            throw new IllegalArgumentException("Default value " + defaultValue + " of column " + getName()
-                    + " would not be a possible value. Set the possible values first.");
+            StringBuilder msg = new StringBuilder();
+            msg.append("Default value ");
+            msg.append(defaultValue);
+            msg.append(" of column ");
+            msg.append(getName());
+            msg.append(" would not be a possible value. Set the possible values first.");
+            throw new IllegalArgumentException(msg.toString());
         }
         possibleValues.put(accepted, label);
     }
@@ -292,28 +360,72 @@ public class Column {
      * @throws IllegalArgumentException If the value does not fit the column.
      */
     private Value validateValue(Value value, String what) {
-        Objects.requireNonNull(value, what + " can not be null");
-        Types type = getType();
+        StringBuilder owner = new StringBuilder();
+        owner.append("column ");
+        owner.append(getName());
+        return validateValue(value, getType(), getLength(), getDecimals(), isNullable(), what, owner.toString());
+    }
+
+    /**
+     * Checks that a default or possible value fits a type, length, decimals and
+     * nullable flag. Shared by {@link Column} and {@link Domain}.
+     *
+     * @param value    The value.
+     * @param type     The type.
+     * @param length   The length, -1 if not applicable.
+     * @param decimals The decimals, -1 if not applicable.
+     * @param nullable Whether null values are accepted.
+     * @param what     What the value is, for error messages.
+     * @param owner    The owner of the value, for error messages.
+     * @return The value, converted to the type if it is a number.
+     * @throws NullPointerException     If the value is null.
+     * @throws IllegalArgumentException If the value does not fit.
+     */
+    static Value validateValue(
+            Value value, Types type, int length, int decimals, boolean nullable, String what, String owner) {
+        if (value == null) {
+            StringBuilder msg = new StringBuilder();
+            msg.append(what);
+            msg.append(" can not be null");
+            throw new NullPointerException(msg.toString());
+        }
         Value accepted = type.accept(value);
         if (accepted.isNull()) {
-            if (!isNullable()) {
-                throw new IllegalArgumentException(what + " can not be null, column " + getName() + " is not nullable");
+            if (!nullable) {
+                StringBuilder msg = new StringBuilder();
+                msg.append(what);
+                msg.append(" can not be null, ");
+                msg.append(owner);
+                msg.append(" is not nullable");
+                throw new IllegalArgumentException(msg.toString());
             }
             return accepted;
         }
-        int decimals = getDecimals();
         if (type.isDecimal() && decimals >= 0) {
             try {
                 accepted = new Value(accepted.getDecimal().setScale(decimals, RoundingMode.UNNECESSARY));
             } catch (ArithmeticException e) {
-                throw new IllegalArgumentException(
-                        what + " " + value + " has more than " + decimals + " decimals, column " + getName());
+                StringBuilder msg = new StringBuilder();
+                msg.append(what);
+                msg.append(" ");
+                msg.append(value);
+                msg.append(" has more than ");
+                msg.append(decimals);
+                msg.append(" decimals, ");
+                msg.append(owner);
+                throw new IllegalArgumentException(msg.toString());
             }
         }
-        int length = getLength();
         if (type.isString() && length > 0 && accepted.getString().length() > length) {
-            throw new IllegalArgumentException(
-                    what + " " + value + " is longer than " + length + ", column " + getName());
+            StringBuilder msg = new StringBuilder();
+            msg.append(what);
+            msg.append(" ");
+            msg.append(value);
+            msg.append(" is longer than ");
+            msg.append(length);
+            msg.append(", ");
+            msg.append(owner);
+            throw new IllegalArgumentException(msg.toString());
         }
         return accepted;
     }
@@ -386,6 +498,26 @@ public class Column {
      */
     public Table getTable() {
         return props.getObject("table", Table.class);
+    }
+
+    /**
+     * Copies the column with all its properties except its table: the copy
+     * belongs to no table until it is added to one. When a table is copied, its
+     * copy adds the copies of its columns.
+     *
+     * @param copier The copier of the copy operation.
+     * @return The copy.
+     */
+    @Override
+    public Column copy(Copier copier) {
+        Column copy = new Column();
+        copier.register(this, copy);
+        for (Object key : props.keys()) {
+            if (!key.equals("table")) {
+                copy.props.putObject(key, copier.copy(props.getObject(key, Object.class)));
+            }
+        }
+        return copy;
     }
 
     /**

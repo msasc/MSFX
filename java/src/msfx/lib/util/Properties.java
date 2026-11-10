@@ -43,7 +43,7 @@ import java.util.TreeSet;
  *
  * @author Miquel Sas
  */
-public class Properties {
+public class Properties implements Copyable<Properties> {
 	/**
 	 * The property map.
 	 */
@@ -63,24 +63,39 @@ public class Properties {
 	}
 
 	/**
-	 * @return A deep copy of this properties object. Values out of
-	 *         {@link Maps#VALUE_CLASSES} are not copied: the copy refers to the
-	 *         same objects.
+	 * Returns a deep copy of this properties object, made with a new
+	 * {@link Copier}: the {@link Maps#VALUE_CLASSES} and {@link Copyable} values
+	 * are copied, and the other values are shared, the copy refers to the same
+	 * objects.
+	 *
+	 * @return The deep copy.
 	 */
+	@Override
 	public Properties copy() {
-		return Maps.copyProperties(this);
+		return new Copier().copy(this);
 	}
 
 	/**
-	 * @return The internal property map, for use by {@link Maps} when copying.
+	 * Copies the properties, sharing keys and copying values with the copier.
+	 *
+	 * @param copier The copier of the copy operation.
+	 * @return The copy.
 	 */
-	Map<Object, Object> map() {
-		return props;
+	@Override
+	public Properties copy(Copier copier) {
+		Properties copy = new Properties();
+		copier.register(this, copy);
+		for (Map.Entry<Object, Object> entry : props.entrySet()) {
+			copy.props.put(entry.getKey(), copier.copy(entry.getValue()));
+		}
+		return copy;
 	}
 
 	/**
 	 * @param key   The key.
-	 * @param value The value to associate with the key.
+	 * @param value The value to associate with the key, of the
+	 *              {@link Maps#VALUE_CLASSES} or {@link Copyable}.
+	 * @throws IllegalArgumentException If the value is null or of another class.
 	 */
 	public void put(Object key, Object value) {
 		Maps.validateValue(value, Maps.VALUE_CLASSES);
@@ -92,8 +107,8 @@ public class Properties {
 	 * {@link Maps#VALUE_CLASSES}. Read it back with
 	 * {@link #getObject(Object, Class)}.
 	 * <p>
-	 * A value out of {@link Maps#VALUE_CLASSES} is not copied by
-	 * {@link #copy()}: the copy refers to the same object.
+	 * A value out of {@link Maps#VALUE_CLASSES} that is not {@link Copyable} is
+	 * not copied by {@link #copy()}: the copy refers to the same object.
 	 *
 	 * @param key   The key.
 	 * @param value The value to associate with the key.

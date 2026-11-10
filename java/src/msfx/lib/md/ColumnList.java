@@ -150,11 +150,18 @@ public class ColumnList implements Iterable<Column> {
 		}
 		for (String existing : columnsByAlias.keySet()) {
 			if (existing.equals(alias)) {
-				throw new IllegalArgumentException("Alias already exists: " + alias);
+				StringBuilder msg = new StringBuilder();
+				msg.append("Alias already exists: ");
+				msg.append(alias);
+				throw new IllegalArgumentException(msg.toString());
 			}
 			if (existing.equalsIgnoreCase(alias)) {
-				throw new IllegalArgumentException(
-						"Alias " + alias + " differs only in case from existing alias " + existing);
+				StringBuilder msg = new StringBuilder();
+				msg.append("Alias ");
+				msg.append(alias);
+				msg.append(" differs only in case from existing alias ");
+				msg.append(existing);
+				throw new IllegalArgumentException(msg.toString());
 			}
 		}
 		if (interceptor != null) {

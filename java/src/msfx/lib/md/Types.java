@@ -173,7 +173,10 @@ public enum Types {
 		if (isObject() && v.isObject()) {
 			return v;
 		}
-		throw new IllegalArgumentException("Invalid value for this type: " + this);
+		StringBuilder msg = new StringBuilder();
+		msg.append("Invalid value for this type: ");
+		msg.append(this);
+		throw new IllegalArgumentException(msg.toString());
 	}
 
 	/**

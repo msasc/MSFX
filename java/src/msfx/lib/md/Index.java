@@ -20,6 +20,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
 import msfx.lib.util.Properties;
 
 /**
@@ -31,14 +33,31 @@ import msfx.lib.util.Properties;
  * {@link Table#setPrimaryKey(Index)}, or as a secondary index, see
  * {@link Table#addIndex(Index)}. The table then sets whether it is unique, and
  * its name if not set.
+ * <p>
+ * Large objects can not be indexed: OBJECT columns, and STRING and BINARY
+ * columns with no length or longer than {@link #MAX_INDEXABLE_LENGTH}, which
+ * databases store as large objects (CLOB, BLOB, NVARCHAR(MAX), VARBINARY(MAX)).
  *
  * @author Miquel Sas
  */
-public class Index {
+public class Index implements Copyable<Index> {
+    /**
+     * Maximum length of an indexable STRING or BINARY column: the smallest
+     * length that the supported databases store without a large object, 2000 in
+     * Oracle for NVARCHAR2 and RAW.
+     */
+    public static final int MAX_INDEXABLE_LENGTH = 2000;
+
     /**
      * Container for the index properties.
      */
     private final Properties props = new Properties();
+
+    /**
+     * Empty index, to be filled by {@link #copy(Copier)}.
+     */
+    private Index() {
+    }
 
     /**
      * @param table The table the index belongs to.
@@ -103,8 +122,9 @@ public class Index {
      * @param columnNames The names of the columns, exactly as in the table.
      * @throws NullPointerException     If a name is null.
      * @throws IllegalArgumentException If the table has no column with a name,
-     *                                  or a column is already in the index or
-     *                                  repeated in the names.
+     *                                  a column is a large object, or a column
+     *                                  is already in the index or repeated in
+     *                                  the names.
      */
     public void addColumns(String... columnNames) {
         ArrayList<Column> columns = columns();
@@ -113,14 +133,43 @@ public class Index {
             Objects.requireNonNull(name, "Column name can not be null");
             Column column = getTable().columns().get(name);
             if (column == null) {
-                throw new IllegalArgumentException("Column " + name + " is not in table " + getTable().getName());
+                StringBuilder msg = new StringBuilder();
+                msg.append("Column ");
+                msg.append(name);
+                msg.append(" is not in table ");
+                msg.append(getTable().getName());
+                throw new IllegalArgumentException(msg.toString());
+            }
+            if (isLargeObject(column)) {
+                StringBuilder msg = new StringBuilder();
+                msg.append("Column ");
+                msg.append(name);
+                msg.append(" is a large object and can not be indexed");
+                throw new IllegalArgumentException(msg.toString());
             }
             if (columns.contains(column) || added.contains(column)) {
-                throw new IllegalArgumentException("Column " + name + " is already in the index");
+                StringBuilder msg = new StringBuilder();
+                msg.append("Column ");
+                msg.append(name);
+                msg.append(" is already in the index");
+                throw new IllegalArgumentException(msg.toString());
             }
             added.add(column);
         }
         columns.addAll(added);
+    }
+
+    /**
+     * @param column The column.
+     * @return Whether the databases store the column as a large object, that can
+     *         not be indexed.
+     */
+    private static boolean isLargeObject(Column column) {
+        return switch (column.getType()) {
+            case OBJECT -> true;
+            case STRING, BINARY -> column.getLength() <= 0 || column.getLength() > MAX_INDEXABLE_LENGTH;
+            default -> false;
+        };
     }
 
     /**
@@ -135,6 +184,37 @@ public class Index {
      */
     public int size() {
         return columns().size();
+    }
+
+    /**
+     * Copies the index. The table and the columns are referred to, not owned:
+     * when the table is copied in the same operation, the copy refers to the
+     * copy of the table and of its columns, and otherwise to the same table and
+     * columns.
+     *
+     * @param copier The copier of the copy operation.
+     * @return The copy.
+     */
+    @Override
+    public Index copy(Copier copier) {
+        Index copy = new Index();
+        copier.register(this, copy);
+        for (Object key : props.keys()) {
+            Object value = props.getObject(key, Object.class);
+            if (key.equals("table")) {
+                value = copier.resolve(value);
+            } else if (key.equals("columns")) {
+                ArrayList<Column> columns = new ArrayList<>();
+                for (Column column : columns()) {
+                    columns.add(copier.resolve(column));
+                }
+                value = columns;
+            } else {
+                value = copier.copy(value);
+            }
+            copy.props.putObject(key, value);
+        }
+        return copy;
     }
 
     /**

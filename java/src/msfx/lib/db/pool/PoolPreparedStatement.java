@@ -18,21 +18,43 @@ package msfx.lib.db.pool;
 
 import msfx.lib.db.DBPreparedStatement;
 import msfx.lib.db.DBResultSet;
+import msfx.lib.md.Types;
 
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Time;
-import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
+/**
+ * Pool prepared statement, a thin wrapper over the JDBC prepared statement
+ * created through a {@link PoolConnection}. It is closed when closed directly
+ * or when its connection is closed.
+ * <p>
+ * Setters of object values set SQL NULL with the proper type when the value is
+ * null, and date and time values are passed as java.time objects (JDBC 4.2),
+ * without conversions through the default time zone.
+ *
+ * @author Miquel Sas
+ */
 class PoolPreparedStatement implements DBPreparedStatement {
 
-	PoolConnection cn;
-	PreparedStatement ps;
+	/**
+	 * The connection that created the statement, informed when it is closed.
+	 */
+	private final PoolConnection cn;
+	/**
+	 * Internal JDBC prepared statement.
+	 */
+	private final PreparedStatement ps;
 
+	/**
+	 * @param cn The connection that created the statement.
+	 * @param ps The JDBC prepared statement to wrap.
+	 */
 	PoolPreparedStatement(PoolConnection cn, PreparedStatement ps) {
 		this.cn = cn;
 		this.ps = ps;
@@ -74,8 +96,12 @@ class PoolPreparedStatement implements DBPreparedStatement {
 	}
 
 	@Override
-	public void setBigDecimal(int index, BigDecimal x) throws SQLException {
-		ps.setBigDecimal(index, x);
+	public void setDecimal(int index, BigDecimal x) throws SQLException {
+		if (x == null) {
+			setNull(index, Types.DECIMAL);
+		} else {
+			ps.setBigDecimal(index, x);
+		}
 	}
 	@Override
 	public void setDouble(int index, double x) throws SQLException {
@@ -91,34 +117,67 @@ class PoolPreparedStatement implements DBPreparedStatement {
 	}
 
 	@Override
-	public void setDate(int index, Date x) throws SQLException {
-		ps.setDate(index, x);
+	public void setDate(int index, LocalDate x) throws SQLException {
+		if (x == null) {
+			setNull(index, Types.DATE);
+		} else {
+			ps.setObject(index, x);
+		}
 	}
 	@Override
-	public void setTime(int index, Time x) throws SQLException {
-		ps.setTime(index, x);
+	public void setTime(int index, LocalTime x) throws SQLException {
+		if (x == null) {
+			setNull(index, Types.TIME);
+		} else {
+			ps.setObject(index, x);
+		}
 	}
 	@Override
-	public void setTimestamp(int index, Timestamp x) throws SQLException {
-		ps.setTimestamp(index, x);
+	public void setDateTime(int index, LocalDateTime x) throws SQLException {
+		if (x == null) {
+			setNull(index, Types.DATETIME);
+		} else {
+			ps.setObject(index, x);
+		}
 	}
 
 	@Override
 	public void setString(int index, String x) throws SQLException {
-		ps.setString(index, x);
+		if (x == null) {
+			setNull(index, Types.STRING);
+		} else {
+			ps.setString(index, x);
+		}
 	}
 	@Override
 	public void setClob(int index, Reader reader) throws SQLException {
-		ps.setClob(index, reader);
+		if (reader == null) {
+			ps.setNull(index, java.sql.Types.CLOB);
+		} else {
+			ps.setClob(index, reader);
+		}
 	}
 
 	@Override
-	public void setBytes(int index, byte[] x) throws SQLException {
-		ps.setBytes(index, x);
+	public void setBinary(int index, byte[] x) throws SQLException {
+		if (x == null) {
+			setNull(index, Types.BINARY);
+		} else {
+			ps.setBytes(index, x);
+		}
 	}
 	@Override
 	public void setBlob(int index, InputStream inputStream) throws SQLException {
-		ps.setBlob(index, inputStream);
+		if (inputStream == null) {
+			ps.setNull(index, java.sql.Types.BLOB);
+		} else {
+			ps.setBlob(index, inputStream);
+		}
+	}
+
+	@Override
+	public void setNull(int index, Types type) throws SQLException {
+		ps.setNull(index, sqlType(type));
 	}
 
 	@Override
@@ -128,5 +187,25 @@ class PoolPreparedStatement implements DBPreparedStatement {
 	@Override
 	public DBResultSet executeQuery() throws SQLException {
 		return new PoolResultSet(ps.executeQuery());
+	}
+
+	/**
+	 * @param type The MSFX type.
+	 * @return The JDBC type code used to set a null value of the type. OBJECT is
+	 *         stored as JSON text.
+	 */
+	private static int sqlType(Types type) {
+		return switch (type) {
+			case BOOLEAN -> java.sql.Types.BOOLEAN;
+			case DECIMAL -> java.sql.Types.DECIMAL;
+			case DOUBLE -> java.sql.Types.DOUBLE;
+			case INTEGER -> java.sql.Types.INTEGER;
+			case LONG -> java.sql.Types.BIGINT;
+			case DATE -> java.sql.Types.DATE;
+			case TIME -> java.sql.Types.TIME;
+			case DATETIME -> java.sql.Types.TIMESTAMP;
+			case STRING, OBJECT -> java.sql.Types.VARCHAR;
+			case BINARY -> java.sql.Types.VARBINARY;
+		};
 	}
 }

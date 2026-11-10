@@ -16,9 +16,14 @@
 
 package msfx.lib.db.pool;
 
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -40,6 +45,11 @@ public class ConnectionPool {
 	 * Closer timer task.
 	 */
 	private class Closer extends TimerTask {
+		/**
+		 * Constructor.
+		 */
+		Closer() {
+		}
 		@Override
 		public void run() {
 			try {
@@ -60,15 +70,27 @@ public class ConnectionPool {
 	 * Period in millis of the scan for free connections to close.
 	 */
 	private static final long CLOSER_PERIOD = 10000;
+	/**
+	 * Idle time in millis from which a free connection is validated with a round
+	 * trip to the database before being handed out.
+	 */
+	private static final long VALIDATION_IDLE = 1000;
+	/**
+	 * Timeout in seconds of the validation, after which a connection whose link
+	 * died silently is considered dead.
+	 */
+	private static final int VALIDATION_TIMEOUT = 5;
 
 	/**
 	 * Connections in use.
 	 */
 	private final Set<PoolEntry> inUse = new HashSet<>();
 	/**
-	 * Connections free.
+	 * Connections free, as a stack: the last returned is the first reused, so the
+	 * connections in use stay warm, and the others age at the bottom until the
+	 * closer closes them.
 	 */
-	private final Set<PoolEntry> free = new HashSet<>();
+	private final Deque<PoolEntry> free = new ArrayDeque<>();
 	/**
 	 * Lock.
 	 */
@@ -83,6 +105,10 @@ public class ConnectionPool {
 	 * is a daemon, so it does not keep the application alive.
 	 */
 	private Timer timer;
+	/**
+	 * Closed flag, once true it is never false again.
+	 */
+	private boolean closed = false;
 
 	/**
 	 * @param factory The factory that opens the physical connections.
@@ -92,46 +118,120 @@ public class ConnectionPool {
 	}
 
 	/**
-	 * @return A new connection handle over a free or a new physical connection.
-	 * @throws SQLException If an error occurs.
+	 * Returns a new connection handle over a free or a new physical connection.
+	 * <p>
+	 * A free connection may have died while idle, by an error in the chain
+	 * driver, network, database. It is checked before being handed out if it has
+	 * been idle at least {@link #VALIDATION_IDLE} millis, with
+	 * {@link Connection#isValid(int)}. A dead one means the others probably died
+	 * for the same cause, so all the free connections are discarded and a new
+	 * one is opened: the caller waits at most one validation timeout.
+	 * <p>
+	 * Checks and opening are done outside the lock, so they do not block
+	 * concurrent requests.
+	 *
+	 * @return A new connection handle.
+	 * @throws SQLException If an error occurs opening a new connection.
+	 * @throws IllegalStateException If the pool is closed.
 	 */
 	public DBConnection getConnection() throws SQLException {
+		PoolEntry entry = takeFree();
+		if (entry != null && !isAlive(entry)) {
+			closeQuietly(entry);
+			discardFree();
+			entry = null;
+		}
+		if (entry == null) {
+			entry = new PoolEntry(factory.open());
+		}
+		register(entry);
+		return new PoolConnection(this, entry);
+	}
 
-		/*
-		 * Look up a free connection. Free connections are already in auto-commit
-		 * mode, see PoolConnection.close().
-		 */
+	/**
+	 * Takes the top free connection, the last returned, removing it from the
+	 * free connections so no other request can take it. Starts the closer with
+	 * the first request.
+	 *
+	 * @return The free connection, or null if there is none.
+	 * @throws IllegalStateException If the pool is closed.
+	 */
+	private PoolEntry takeFree() {
 		lock.lock();
 		try {
+			if (closed) {
+				throw new IllegalStateException("Connection pool is closed");
+			}
 			if (timer == null) {
 				timer = new Timer("ConnectionPool closer", true);
 				timer.schedule(new Closer(), CLOSER_PERIOD, CLOSER_PERIOD);
 			}
-			Iterator<PoolEntry> i = free.iterator();
-			if (i.hasNext()) {
-				PoolEntry entry = i.next();
-				i.remove();
+			return free.pollFirst();
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	/**
+	 * Checks whether a free connection is still alive. The local closed flag is
+	 * always checked, and the round trip to the database only if the connection
+	 * has been idle at least {@link #VALIDATION_IDLE} millis: one returned a
+	 * moment ago is almost certainly alive.
+	 *
+	 * @param entry The free connection, already taken from the pool.
+	 * @return True if the connection can be used.
+	 */
+	private static boolean isAlive(PoolEntry entry) {
+		try {
+			if (entry.cn.isClosed()) {
+				return false;
+			}
+			if (System.currentTimeMillis() - entry.timeNotActive < VALIDATION_IDLE) {
+				return true;
+			}
+			return entry.cn.isValid(VALIDATION_TIMEOUT);
+		} catch (SQLException e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Registers a connection as in use. If the pool has been closed meanwhile,
+	 * the connection is closed.
+	 *
+	 * @param entry The connection.
+	 * @throws IllegalStateException If the pool is closed.
+	 */
+	private void register(PoolEntry entry) {
+		lock.lock();
+		try {
+			if (!closed) {
 				entry.timeNotActive = 0;
 				inUse.add(entry);
-				return new PoolConnection(this, entry);
+				return;
 			}
 		} finally {
 			lock.unlock();
 		}
+		closeQuietly(entry);
+		throw new IllegalStateException("Connection pool is closed");
+	}
 
-		/*
-		 * Open the physical connection outside the lock, it may take long and would block concurrent
-		 * requests, and register it under the lock, sets are not thread safe.
-		 */
-		PoolEntry entry = new PoolEntry(factory.open());
-
+	/**
+	 * Closes all the free connections, outside the lock.
+	 */
+	private void discardFree() {
+		List<PoolEntry> toClose;
 		lock.lock();
 		try {
-			inUse.add(entry);
+			toClose = new ArrayList<>(free);
+			free.clear();
 		} finally {
 			lock.unlock();
 		}
-		return new PoolConnection(this, entry);
+		for (PoolEntry entry : toClose) {
+			closeQuietly(entry);
+		}
 	}
 
 	/**
@@ -162,18 +262,51 @@ public class ConnectionPool {
 	}
 
 	/**
-	 * Return a physical connection to the pool, already in auto-commit mode.
+	 * Closes the pool: stops the closer and closes the free connections. The
+	 * connections in use are closed when their users close them. Once closed,
+	 * the pool gives no more connections. Closing a closed pool has no effect.
+	 */
+	public void close() {
+		List<PoolEntry> toClose;
+		lock.lock();
+		try {
+			if (closed) {
+				return;
+			}
+			closed = true;
+			if (timer != null) {
+				timer.cancel();
+				timer = null;
+			}
+			toClose = new ArrayList<>(free);
+			free.clear();
+		} finally {
+			lock.unlock();
+		}
+		// Close outside the lock, closing may take a round trip to the server.
+		for (PoolEntry entry : toClose) {
+			closeQuietly(entry);
+		}
+	}
+
+	/**
+	 * Return a physical connection to the pool, already in auto-commit mode, or
+	 * close it if the pool is closed.
 	 * @param entry The pooled connection.
 	 */
 	void recycleConnection(PoolEntry entry) {
 		lock.lock();
 		try {
-			entry.timeNotActive = System.currentTimeMillis();
 			inUse.remove(entry);
-			free.add(entry);
+			if (!closed) {
+				entry.timeNotActive = System.currentTimeMillis();
+				free.addFirst(entry);
+				return;
+			}
 		} finally {
 			lock.unlock();
 		}
+		closeQuietly(entry);
 	}
 
 	/**
@@ -188,6 +321,14 @@ public class ConnectionPool {
 		} finally {
 			lock.unlock();
 		}
+		closeQuietly(entry);
+	}
+
+	/**
+	 * Close a physical connection, ignoring errors.
+	 * @param entry The pooled connection.
+	 */
+	private static void closeQuietly(PoolEntry entry) {
 		try {
 			entry.cn.close();
 		} catch (SQLException ignore) {

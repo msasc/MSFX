@@ -50,11 +50,21 @@ public class Record {
             Value value = values[i];
             Column column = columns.get(i);
             if (value == null) {
-                throw new IllegalArgumentException("Value of column " + columns.getAlias(i) + " is null");
+                StringBuilder msg = new StringBuilder();
+                msg.append("Value of column ");
+                msg.append(columns.getAlias(i));
+                msg.append(" is null");
+                throw new IllegalArgumentException(msg.toString());
             }
             if (value.getType() != column.getType()) {
-                throw new IllegalArgumentException("Value of column " + columns.getAlias(i) + " is "
-                        + value.getType() + ", expected " + column.getType());
+                StringBuilder msg = new StringBuilder();
+                msg.append("Value of column ");
+                msg.append(columns.getAlias(i));
+                msg.append(" is ");
+                msg.append(value.getType());
+                msg.append(", expected ");
+                msg.append(column.getType());
+                throw new IllegalArgumentException(msg.toString());
             }
         }
     }
@@ -141,7 +151,10 @@ public class Record {
     public Value getValue(String alias) {
         int index = columns.indexOf(alias);
         if (index == -1) {
-            throw new IllegalArgumentException("Column not found: " + alias);
+            StringBuilder msg = new StringBuilder();
+            msg.append("Column not found: ");
+            msg.append(alias);
+            throw new IllegalArgumentException(msg.toString());
         }
         return values[index];
     }

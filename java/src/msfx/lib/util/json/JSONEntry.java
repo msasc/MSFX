@@ -23,6 +23,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
+
 import static msfx.lib.util.json.JSONTypes.*;
 
 /**
@@ -30,7 +33,7 @@ import static msfx.lib.util.json.JSONTypes.*;
  *
  * @author Miquel Sas
  */
-public class JSONEntry {
+public class JSONEntry implements Copyable<JSONEntry> {
 
 	/**
 	 * Type.
@@ -172,6 +175,24 @@ public class JSONEntry {
 
 		this.type = type;
 		this.value = value;
+	}
+
+	/**
+	 * Copies the entry: nested objects and arrays are copied with the copier,
+	 * binaries are cloned, and the other values are immutable and shared.
+	 *
+	 * @param copier The copier of the copy operation.
+	 * @return The copy.
+	 */
+	@Override
+	public JSONEntry copy(Copier copier) {
+		Object copy = value;
+		if (value instanceof byte[] bytes) {
+			copy = bytes.clone();
+		} else if (value instanceof JSONObject || value instanceof JSONArray) {
+			copy = copier.copy(value);
+		}
+		return new JSONEntry(type, copy);
 	}
 
 	/**

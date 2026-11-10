@@ -26,17 +26,36 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
+
 /**
  * JSON Array.
  *
  * @author Miquel Sas
  */
-public class JSONArray implements Iterable<JSONEntry> {
+public class JSONArray implements Iterable<JSONEntry>, Copyable<JSONArray> {
 
 	/**
 	 * List of entries.
 	 */
 	private final List<JSONEntry> entries = new ArrayList<>();
+
+	/**
+	 * Copies the array, with a copy of each entry, in the same order.
+	 *
+	 * @param copier The copier of the copy operation.
+	 * @return The copy.
+	 */
+	@Override
+	public JSONArray copy(Copier copier) {
+		JSONArray copy = new JSONArray();
+		copier.register(this, copy);
+		for (JSONEntry entry : entries) {
+			copy.entries.add(copier.copy(entry));
+		}
+		return copy;
+	}
 
 	/**
 	 * @param arr The string JSON array to parse.

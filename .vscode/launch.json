@@ -3,6 +3,20 @@
     "configurations": [
         {
             "type": "java",
+            "name": "TestConnection",
+            "request": "launch",
+            "mainClass": "ztest.db.TestConnection",
+            "projectName": "msfx_2198cc6b"
+        },
+        {
+            "type": "java",
+            "name": "TestConnectionMSFX",
+            "request": "launch",
+            "mainClass": "ztest.TestConnectionMSFX",
+            "projectName": "msfx_2198cc6b"
+        },
+        {
+            "type": "java",
             "name": "TestLinkedHashMap",
             "request": "launch",
             "mainClass": "ztest.TestLinkedHashMap",

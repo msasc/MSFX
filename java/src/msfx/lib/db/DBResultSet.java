@@ -19,15 +19,15 @@ package msfx.lib.db;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.sql.Date;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Time;
-import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 /**
  * A simplified JDBC result set, read forward only, with one getter per type of
- * {@link msfx.lib.md.Types}.
+ * {@link msfx.lib.md.Types}, named and typed as in {@link msfx.lib.md.Value}.
  * <p>
  * Column values are accessed by index, starting at 1 as in JDBC, or by alias,
  * the label given to the column in the query (AS alias), which is the column
@@ -87,14 +87,14 @@ public interface DBResultSet extends AutoCloseable {
 	 * @return The value.
 	 * @throws SQLException If an error occurs.
 	 */
-	BigDecimal getBigDecimal(int index) throws SQLException;
+	BigDecimal getDecimal(int index) throws SQLException;
 	/**
 	 * DECIMAL.
 	 * @param alias The column alias.
 	 * @return The value.
 	 * @throws SQLException If an error occurs or the alias is not found.
 	 */
-	BigDecimal getBigDecimal(String alias) throws SQLException;
+	BigDecimal getDecimal(String alias) throws SQLException;
 	/**
 	 * DOUBLE.
 	 * @param index The column index, starting at 1.
@@ -144,42 +144,42 @@ public interface DBResultSet extends AutoCloseable {
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	Date getDate(int index) throws SQLException;
+	LocalDate getDate(int index) throws SQLException;
 	/**
 	 * DATE.
 	 * @param alias The column alias.
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs or the alias is not found.
 	 */
-	Date getDate(String alias) throws SQLException;
+	LocalDate getDate(String alias) throws SQLException;
 	/**
 	 * TIME.
 	 * @param index The column index, starting at 1.
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	Time getTime(int index) throws SQLException;
+	LocalTime getTime(int index) throws SQLException;
 	/**
 	 * TIME.
 	 * @param alias The column alias.
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs or the alias is not found.
 	 */
-	Time getTime(String alias) throws SQLException;
+	LocalTime getTime(String alias) throws SQLException;
 	/**
 	 * DATETIME.
 	 * @param index The column index, starting at 1.
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	Timestamp getTimestamp(int index) throws SQLException;
+	LocalDateTime getDateTime(int index) throws SQLException;
 	/**
 	 * DATETIME.
 	 * @param alias The column alias.
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs or the alias is not found.
 	 */
-	Timestamp getTimestamp(String alias) throws SQLException;
+	LocalDateTime getDateTime(String alias) throws SQLException;
 
 	/**
 	 * STRING, and OBJECT as JSON text.
@@ -216,14 +216,14 @@ public interface DBResultSet extends AutoCloseable {
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs.
 	 */
-	byte[] getBytes(int index) throws SQLException;
+	byte[] getBinary(int index) throws SQLException;
 	/**
 	 * BINARY.
 	 * @param alias The column alias.
 	 * @return The value, or null.
 	 * @throws SQLException If an error occurs or the alias is not found.
 	 */
-	byte[] getBytes(String alias) throws SQLException;
+	byte[] getBinary(String alias) throws SQLException;
 	/**
 	 * BINARY stored as BLOB, read as a stream.
 	 * @param index The column index, starting at 1.

@@ -20,6 +20,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
 import msfx.lib.util.Properties;
 
 /**
@@ -32,7 +34,7 @@ import msfx.lib.util.Properties;
  *
  * @author Miquel Sas
  */
-public class ForeignKey {
+public class ForeignKey implements Copyable<ForeignKey> {
 
     /**
      * A segment of the foreign key: a local column and the foreign column it
@@ -62,6 +64,12 @@ public class ForeignKey {
      * Container for the foreign key properties.
      */
     private final Properties props = new Properties();
+
+    /**
+     * Empty foreign key, to be filled by {@link #copy(Copier)}.
+     */
+    private ForeignKey() {
+    }
 
     /**
      * @param localTable   The local table, that refers to the foreign table.
@@ -130,6 +138,38 @@ public class ForeignKey {
     }
 
     /**
+     * Copies the foreign key. The tables and columns are referred to, not owned:
+     * when the local table is copied in the same operation, the copy refers to
+     * the copy of the local table and of its columns, and so for the foreign
+     * table. A foreign table not copied, the usual case, is shared.
+     *
+     * @param copier The copier of the copy operation.
+     * @return The copy.
+     */
+    @Override
+    public ForeignKey copy(Copier copier) {
+        ForeignKey copy = new ForeignKey();
+        copier.register(this, copy);
+        for (Object key : props.keys()) {
+            Object value = props.getObject(key, Object.class);
+            if (key.equals("local-table") || key.equals("foreign-table")) {
+                value = copier.resolve(value);
+            } else if (key.equals("segments")) {
+                ArrayList<Segment> segments = new ArrayList<>();
+                for (Segment segment : segments()) {
+                    segments.add(new Segment(
+                            copier.resolve(segment.localColumn), copier.resolve(segment.foreignColumn)));
+                }
+                value = segments;
+            } else {
+                value = copier.copy(value);
+            }
+            copy.props.putObject(key, value);
+        }
+        return copy;
+    }
+
+    /**
      * @return The internal list of segments.
      */
     private ArrayList<Segment> segments() {
@@ -147,7 +187,12 @@ public class ForeignKey {
         Objects.requireNonNull(name, "Column name can not be null");
         Column column = table.columns().get(name);
         if (column == null) {
-            throw new IllegalArgumentException("Column " + name + " is not in table " + table.getName());
+            StringBuilder msg = new StringBuilder();
+            msg.append("Column ");
+            msg.append(name);
+            msg.append(" is not in table ");
+            msg.append(table.getName());
+            throw new IllegalArgumentException(msg.toString());
         }
         return column;
     }

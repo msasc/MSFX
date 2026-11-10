@@ -26,12 +26,15 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import msfx.lib.util.Copier;
+import msfx.lib.util.Copyable;
+
 /**
  * JSON Object.
  *
  * @author Miquel Sas
  */
-public class JSONObject {
+public class JSONObject implements Copyable<JSONObject> {
 
 	/**
 	 * @param obj The string JSON object to parse.
@@ -60,6 +63,23 @@ public class JSONObject {
 	 * Map ordered by insertion.
 	 */
 	private final Map<String, JSONEntry> entries = new LinkedHashMap<>();
+
+	/**
+	 * Copies the object, with a copy of each entry, in the same order.
+	 *
+	 * @param copier The copier of the copy operation.
+	 * @return The copy.
+	 */
+	@Override
+	public JSONObject copy(Copier copier) {
+		JSONObject copy = new JSONObject();
+		copier.register(this, copy);
+		for (Map.Entry<String, JSONEntry> entry : entries.entrySet()) {
+			copy.entries.put(entry.getKey(), copier.copy(entry.getValue()));
+		}
+		return copy;
+	}
+
 	/**
 	 * @param key The key.
 	 * @return The {@link JSONEntry} with the given key.

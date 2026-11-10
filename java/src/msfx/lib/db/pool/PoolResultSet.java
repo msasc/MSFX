@@ -21,12 +21,12 @@ import msfx.lib.db.DBResultSet;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Time;
-import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 /**
  * Pool result set, a thin wrapper over the JDBC result set. It is closed when
@@ -75,11 +75,11 @@ class PoolResultSet implements DBResultSet {
 	}
 
 	@Override
-	public BigDecimal getBigDecimal(int index) throws SQLException {
+	public BigDecimal getDecimal(int index) throws SQLException {
 		return rs.getBigDecimal(index);
 	}
 	@Override
-	public BigDecimal getBigDecimal(String alias) throws SQLException {
+	public BigDecimal getDecimal(String alias) throws SQLException {
 		return rs.getBigDecimal(alias);
 	}
 	@Override
@@ -108,28 +108,28 @@ class PoolResultSet implements DBResultSet {
 	}
 
 	@Override
-	public Date getDate(int index) throws SQLException {
-		return rs.getDate(index);
+	public LocalDate getDate(int index) throws SQLException {
+		return rs.getObject(index, LocalDate.class);
 	}
 	@Override
-	public Date getDate(String alias) throws SQLException {
-		return rs.getDate(alias);
+	public LocalDate getDate(String alias) throws SQLException {
+		return rs.getObject(alias, LocalDate.class);
 	}
 	@Override
-	public Time getTime(int index) throws SQLException {
-		return rs.getTime(index);
+	public LocalTime getTime(int index) throws SQLException {
+		return rs.getObject(index, LocalTime.class);
 	}
 	@Override
-	public Time getTime(String alias) throws SQLException {
-		return rs.getTime(alias);
+	public LocalTime getTime(String alias) throws SQLException {
+		return rs.getObject(alias, LocalTime.class);
 	}
 	@Override
-	public Timestamp getTimestamp(int index) throws SQLException {
-		return rs.getTimestamp(index);
+	public LocalDateTime getDateTime(int index) throws SQLException {
+		return rs.getObject(index, LocalDateTime.class);
 	}
 	@Override
-	public Timestamp getTimestamp(String alias) throws SQLException {
-		return rs.getTimestamp(alias);
+	public LocalDateTime getDateTime(String alias) throws SQLException {
+		return rs.getObject(alias, LocalDateTime.class);
 	}
 
 	@Override
@@ -150,11 +150,11 @@ class PoolResultSet implements DBResultSet {
 	}
 
 	@Override
-	public byte[] getBytes(int index) throws SQLException {
+	public byte[] getBinary(int index) throws SQLException {
 		return rs.getBytes(index);
 	}
 	@Override
-	public byte[] getBytes(String alias) throws SQLException {
+	public byte[] getBinary(String alias) throws SQLException {
 		return rs.getBytes(alias);
 	}
 	@Override
