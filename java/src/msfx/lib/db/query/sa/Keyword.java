@@ -52,7 +52,9 @@ public enum Keyword {
 	/** Default result of a CASE expression. */
 	ELSE,
 	/** End of a CASE expression. */
-	END;
+	END,
+	/** Different values only, as the first word inside an aggregate. */
+	DISTINCT;
 
 	/**
 	 * Map of keywords by word, ignoring case.
