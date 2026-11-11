@@ -55,8 +55,10 @@ public class QCreateSchema extends QBase {
 			throw new IllegalArgumentException("Schema can not be blank");
 		}
 		boolean supported = switch (db.getAdapter()) {
-			case SQLSERVER -> true;
-			case ORACLE -> false;
+			case SQLSERVER:
+				yield true;
+			case ORACLE:
+				yield false;
 		};
 		if (!supported) {
 			StringBuilder msg = new StringBuilder();

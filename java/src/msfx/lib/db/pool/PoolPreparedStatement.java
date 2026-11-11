@@ -195,17 +195,29 @@ class PoolPreparedStatement implements DBPreparedStatement {
 	 *         stored as JSON text.
 	 */
 	private static int sqlType(Types type) {
-		return switch (type) {
-			case BOOLEAN -> java.sql.Types.BOOLEAN;
-			case DECIMAL -> java.sql.Types.DECIMAL;
-			case DOUBLE -> java.sql.Types.DOUBLE;
-			case INTEGER -> java.sql.Types.INTEGER;
-			case LONG -> java.sql.Types.BIGINT;
-			case DATE -> java.sql.Types.DATE;
-			case TIME -> java.sql.Types.TIME;
-			case DATETIME -> java.sql.Types.TIMESTAMP;
-			case STRING, OBJECT -> java.sql.Types.VARCHAR;
-			case BINARY -> java.sql.Types.VARBINARY;
+		int sqlType = switch (type) {
+			case BOOLEAN:
+				yield java.sql.Types.BOOLEAN;
+			case DECIMAL:
+				yield java.sql.Types.DECIMAL;
+			case DOUBLE:
+				yield java.sql.Types.DOUBLE;
+			case INTEGER:
+				yield java.sql.Types.INTEGER;
+			case LONG:
+				yield java.sql.Types.BIGINT;
+			case DATE:
+				yield java.sql.Types.DATE;
+			case TIME:
+				yield java.sql.Types.TIME;
+			case DATETIME:
+				yield java.sql.Types.TIMESTAMP;
+			case STRING:
+			case OBJECT:
+				yield java.sql.Types.VARCHAR;
+			case BINARY:
+				yield java.sql.Types.VARBINARY;
 		};
+		return sqlType;
 	}
 }

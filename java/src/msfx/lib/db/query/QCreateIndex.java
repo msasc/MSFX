@@ -115,13 +115,18 @@ public class QCreateIndex extends QBase {
 	private String toSQL() {
 		DBEngine db = getDBEngine();
 		StringBuilder sql = new StringBuilder();
-		sql.append(switch (db.getAdapter()) {
-			case SQLSERVER -> "CREATE NONCLUSTERED INDEX ";
-			case ORACLE -> "CREATE INDEX ";
-		});
+		String create = switch (db.getAdapter()) {
+			case SQLSERVER:
+				yield "CREATE NONCLUSTERED INDEX ";
+			case ORACLE:
+				yield "CREATE INDEX ";
+		};
+		sql.append(create);
 		boolean schemaIndexes = switch (db.getAdapter()) {
-			case ORACLE -> true;
-			case SQLSERVER -> false;
+			case ORACLE:
+				yield true;
+			case SQLSERVER:
+				yield false;
 		};
 		if (schemaIndexes && table.getSchema() != null) {
 			sql.append(db.quote(table.getSchema()));

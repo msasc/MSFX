@@ -18,8 +18,10 @@ package msfx.lib.db.adapters;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 import msfx.lib.db.DBEngine;
+import msfx.lib.db.query.sa.Function;
 import msfx.lib.md.Column;
 import msfx.lib.md.Table;
 import msfx.lib.md.Types;
@@ -142,6 +144,141 @@ public class DBEngineSQLServer extends DBEngine {
 		return cond.toString();
 	}
 
+	/**
+	 * Translations that differ from the name of the function:
+	 * <ul>
+	 * <li>LENGTH: COALESCE(LEN((s) + N'x') - 1, 0), because LEN ignores trailing
+	 * spaces.</li>
+	 * <li>POSITION(s, sub): CHARINDEX(sub, s).</li>
+	 * <li>LPAD: RIGHT(REPLICATE(c, n) + LEFT(s, n), n).</li>
+	 * <li>RPAD: LEFT(LEFT(s, n) + REPLICATE(c, n), n).</li>
+	 * <li>ROUND(n): ROUND(n, 0). TRUNCATE(n, d): ROUND(n, d, 1).</li>
+	 * <li>MOD(a, b): ((a) % (b)).</li>
+	 * <li>CURRENT_DATE: CAST(GETDATE() AS DATE). CURRENT_TIMESTAMP:
+	 * SYSDATETIME(), with the precision of DATETIME2.</li>
+	 * <li>HOUR, MINUTE, SECOND: DATEPART. ADD_DAYS, ADD_MONTHS: DATEADD.
+	 * DAYS_BETWEEN: DATEDIFF.</li>
+	 * <li>TO_NUMBER: CAST(s AS DECIMAL(38, 10)). TO_DATE: CONVERT with the ISO
+	 * style 23.</li>
+	 * <li>TO_TIMESTAMP: CONVERT(DATETIME2(7), REPLACE(s, 'T', ' '), 121), because
+	 * the ISO style 126 rejects a time without seconds.</li>
+	 * </ul>
+	 * LPAD and RPAD write their length argument three times.
+	 */
+	@Override
+	public String getFunctionSQL(Function function, List<String> arguments) {
+		String sql = switch (function) {
+			case COUNT:
+			case SUM:
+			case AVG:
+			case MIN:
+			case MAX:
+			case SUBSTRING:
+			case LEFT:
+			case RIGHT:
+			case UPPER:
+			case LOWER:
+			case TRIM:
+			case LTRIM:
+			case RTRIM:
+			case REPLACE:
+			case ABS:
+			case SIGN:
+			case SQRT:
+			case FLOOR:
+			case CEILING:
+			case POWER:
+			case COALESCE:
+			case NULLIF:
+			case YEAR:
+			case MONTH:
+			case DAY:
+				yield getCallSQL(function.name(), arguments);
+			case LENGTH: {
+				StringBuilder b = new StringBuilder();
+				b.append("COALESCE(LEN(");
+				b.append(getOperandSQL(arguments.get(0)));
+				b.append(" + N'x') - 1, 0)");
+				yield b.toString();
+			}
+			case POSITION:
+				yield getCallSQL("CHARINDEX", List.of(arguments.get(1), arguments.get(0)));
+			case LPAD: {
+				String n = arguments.get(1);
+				StringBuilder b = new StringBuilder();
+				b.append(getCallSQL("REPLICATE", List.of(getPadSQL(arguments), n)));
+				b.append(" + ");
+				b.append(getCallSQL("LEFT", List.of(arguments.get(0), n)));
+				yield getCallSQL("RIGHT", List.of(b.toString(), n));
+			}
+			case RPAD: {
+				String n = arguments.get(1);
+				StringBuilder b = new StringBuilder();
+				b.append(getCallSQL("LEFT", List.of(arguments.get(0), n)));
+				b.append(" + ");
+				b.append(getCallSQL("REPLICATE", List.of(getPadSQL(arguments), n)));
+				yield getCallSQL("LEFT", List.of(b.toString(), n));
+			}
+			case ROUND:
+				yield getCallSQL("ROUND", List.of(arguments.get(0), getDecimalsSQL(arguments)));
+			case TRUNCATE:
+				yield getCallSQL("ROUND", List.of(arguments.get(0), getDecimalsSQL(arguments), "1"));
+			case MOD: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(getOperandSQL(arguments.get(0)));
+				b.append(" % ");
+				b.append(getOperandSQL(arguments.get(1)));
+				b.append(")");
+				yield b.toString();
+			}
+			case CURRENT_DATE:
+				yield "CAST(GETDATE() AS DATE)";
+			case CURRENT_TIMESTAMP:
+				yield "SYSDATETIME()";
+			case HOUR:
+			case MINUTE:
+			case SECOND:
+				yield getCallSQL("DATEPART", List.of(function.name(), arguments.get(0)));
+			case ADD_DAYS:
+				yield getCallSQL("DATEADD", List.of("DAY", arguments.get(1), arguments.get(0)));
+			case ADD_MONTHS:
+				yield getCallSQL("DATEADD", List.of("MONTH", arguments.get(1), arguments.get(0)));
+			case DAYS_BETWEEN:
+				yield getCallSQL("DATEDIFF", List.of("DAY", arguments.get(0), arguments.get(1)));
+			case TO_STRING:
+				throw new UnsupportedOperationException("Not implemented yet");
+			case TO_NUMBER: {
+				StringBuilder b = new StringBuilder();
+				b.append("CAST(");
+				b.append(arguments.get(0));
+				b.append(" AS DECIMAL(38, 10))");
+				yield b.toString();
+			}
+			case TO_DATE:
+				yield getCallSQL("CONVERT", List.of("DATE", arguments.get(0), "23"));
+			case TO_TIMESTAMP:
+				yield getCallSQL("CONVERT", List.of("DATETIME2(7)", getCallSQL("REPLACE", List.of(arguments.get(0), "'T'", "' '")), "121"));
+		};
+		return sql;
+	}
+
+	/**
+	 * @param arguments The arguments of LPAD or RPAD.
+	 * @return The pad character, a space if not given.
+	 */
+	private static String getPadSQL(List<String> arguments) {
+		return arguments.size() > 2 ? arguments.get(2) : "N' '";
+	}
+
+	/**
+	 * @param arguments The arguments of ROUND or TRUNCATE.
+	 * @return The number of decimals, 0 if not given.
+	 */
+	private static String getDecimalsSQL(List<String> arguments) {
+		return arguments.size() > 1 ? arguments.get(1) : "0";
+	}
+
 	@Override
 	protected String getURL(String cnString) {
 		StringBuilder url = new StringBuilder();
@@ -209,31 +346,42 @@ public class DBEngineSQLServer extends DBEngine {
 	private static String literal(Types type, Value value) {
 		StringBuilder literal = new StringBuilder();
 		switch (type) {
-			case BOOLEAN -> literal.append(value.getBoolean() ? "'1'" : "'0'");
-			case DECIMAL -> literal.append(value.getDecimal().toPlainString());
-			case DOUBLE -> literal.append(BigDecimal.valueOf(value.getDouble()).toPlainString());
-			case INTEGER, LONG -> literal.append(value.getLong());
-			case STRING -> {
+			case BOOLEAN:
+				literal.append(value.getBoolean() ? "'1'" : "'0'");
+				break;
+			case DECIMAL:
+				literal.append(value.getDecimal().toPlainString());
+				break;
+			case DOUBLE:
+				literal.append(BigDecimal.valueOf(value.getDouble()).toPlainString());
+				break;
+			case INTEGER:
+			case LONG:
+				literal.append(value.getLong());
+				break;
+			case STRING:
 				literal.append("N'");
 				literal.append(value.getString().replace("'", "''"));
 				literal.append("'");
-			}
-			case DATE -> {
+				break;
+			case DATE:
 				literal.append("'");
 				literal.append(value.getDate());
 				literal.append("'");
-			}
-			case TIME -> {
+				break;
+			case TIME:
 				literal.append("'");
 				literal.append(value.getTime());
 				literal.append("'");
-			}
-			case DATETIME -> {
+				break;
+			case DATETIME:
 				literal.append("'");
 				literal.append(DATETIME.format(value.getDateTime()));
 				literal.append("'");
-			}
-			case BINARY, OBJECT -> throw new UnsupportedOperationException("Not implemented yet");
+				break;
+			case BINARY:
+			case OBJECT:
+				throw new UnsupportedOperationException("Not implemented yet");
 		}
 		return literal.toString();
 	}

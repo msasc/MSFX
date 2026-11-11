@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ztest;
+package test;
 
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -692,16 +692,22 @@ public class TestJSON {
 		StringBuilder b = new StringBuilder();
 		for (char c : s.toCharArray()) {
 			switch (c) {
-				case '\n' -> b.append("\\n");
-				case '\r' -> b.append("\\r");
-				case '\t' -> b.append("\\t");
-				default -> {
+				case '\n':
+					b.append("\\n");
+					break;
+				case '\r':
+					b.append("\\r");
+					break;
+				case '\t':
+					b.append("\\t");
+					break;
+				default:
 					if (c < 0x20 || c == 0xa0) {
 						b.append(String.format("\\u%04x", (int) c));
 					} else {
 						b.append(c);
 					}
-				}
+					break;
 			}
 		}
 		return b.toString();

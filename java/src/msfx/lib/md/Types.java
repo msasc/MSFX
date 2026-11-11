@@ -113,19 +113,43 @@ public enum Types {
 	 * @return True if the type is nullable, false otherwise.
 	 */
 	public boolean isNullable() {
-		return switch (this) {
-			case DATE, TIME, DATETIME, BINARY, OBJECT -> true;
-			default -> false;
+		boolean nullable = switch (this) {
+			case DATE:
+			case TIME:
+			case DATETIME:
+			case BINARY:
+			case OBJECT:
+				yield true;
+			case BOOLEAN:
+			case DECIMAL:
+			case DOUBLE:
+			case INTEGER:
+			case LONG:
+			case STRING:
+				yield false;
 		};
+		return nullable;
 	}
 	/**
 	 * @return True if the type is a number, false otherwise.
 	 */
 	public boolean isNumber() {
-		return switch (this) {
-			case DECIMAL, DOUBLE, INTEGER, LONG -> true;
-			default -> false;
+		boolean number = switch (this) {
+			case DECIMAL:
+			case DOUBLE:
+			case INTEGER:
+			case LONG:
+				yield true;
+			case BOOLEAN:
+			case STRING:
+			case DATE:
+			case TIME:
+			case DATETIME:
+			case BINARY:
+			case OBJECT:
+				yield false;
 		};
+		return number;
 	}
 
 	/**
@@ -202,19 +226,31 @@ public enum Types {
 	 * @throws NullPointerException If the type is null.
 	 */
 	public static Value getDefaultValue(Types type, int decimals) {
-		return switch (type) {
-			case BOOLEAN -> new Value(false);
-			case DECIMAL -> new Value(new BigDecimal(Strings.defaultStringNumber(decimals)));
-			case DOUBLE -> new Value((double) 0);
-			case INTEGER -> new Value(0);
-			case LONG -> new Value((long) 0);
-			case DATE -> new Value((LocalDate) null);
-			case TIME -> new Value((LocalTime) null);
-			case DATETIME -> new Value((LocalDateTime) null);
-			case STRING -> new Value("");
-			case BINARY -> new Value((byte[]) null);
-			case OBJECT -> new Value((JSONObject) null);
+		Value value = switch (type) {
+			case BOOLEAN:
+				yield new Value(false);
+			case DECIMAL:
+				yield new Value(new BigDecimal(Strings.defaultStringNumber(decimals)));
+			case DOUBLE:
+				yield new Value((double) 0);
+			case INTEGER:
+				yield new Value(0);
+			case LONG:
+				yield new Value((long) 0);
+			case DATE:
+				yield new Value((LocalDate) null);
+			case TIME:
+				yield new Value((LocalTime) null);
+			case DATETIME:
+				yield new Value((LocalDateTime) null);
+			case STRING:
+				yield new Value("");
+			case BINARY:
+				yield new Value((byte[]) null);
+			case OBJECT:
+				yield new Value((JSONObject) null);
 		};
+		return value;
 	}
 
 }

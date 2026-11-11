@@ -13,7 +13,10 @@ desktop and task concurrency packages) must be as well defined as possible.
 - `java/src/msfx/lib/db`: DBEngine, connections, statements, result sets, the
   connection pool (`db.pool`) and the adapters (`db.adapters`).
 - `java/src/msfx/lib/db/query`: the query generator, one class per statement.
-- `java/src/ztest`: manual tests against the local SQL Server.
+  `db.query.sa`: the syntax analyzer of hand-written expressions (Token,
+  Lexer, Keyword, Operator, Function).
+- `java/src/test`: manual tests, run with `main`. Claude writes its tests in
+  `test.claude`, in sub-packages as needed, never as scratch files.
 - `java/lib`: JDK and JavaFX (not in Git, downloaded separately) and the JDBC
   drivers. `java/doc` is generated Javadoc.
 
@@ -64,20 +67,23 @@ desktop and task concurrency packages) must be as well defined as possible.
 ## Code style
 
 - Apache license header, `@author Miquel Sas`, Javadoc on every member.
-- Indentation: tabs in db, db.query, util, ztest, `ColumnList` and `Types`;
+- Indentation: tabs in db, db.query, util, test, `ColumnList` and `Types`;
   4 spaces in the rest of md and in `QBase`.
 - Text is always composed with a `StringBuilder`, one append per piece, even for
   short compositions and exception messages. Never `+` or `+=`.
 - Initials keep their case in identifiers: `toSQL`, `DBEngine`, `getDBEngine`,
   `getURL`, `JSONObject`. Naming conventions give way to readability.
+- Switches use the old colon labels (`case X:`), never arrows (`->`), for
+  readability and step-by-step debugging. Over an enum, write a switch
+  expression with `yield` and no `default`, so the compiler checks that every
+  constant is handled; assign it to a local before returning it.
 - Methods not yet implemented throw
   `new UnsupportedOperationException("Not implemented yet")`.
-- `ZBack` in db.query is a temporary store of code to reuse later.
 
 ## Workflow
 
 - The user asks for analysis first on design questions, then says to implement.
-- Don't commit unless asked. The ztest password is for a local development
+- Don't commit unless asked. The test password is for a local development
   database and may be committed; production credentials (client databases,
   through a VPN) must never be in the code or the repository.
 - Don't run DDL against a database without permission.

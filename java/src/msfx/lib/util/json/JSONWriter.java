@@ -184,20 +184,34 @@ public class JSONWriter {
 		for (int i = 0; i < s.length(); i++) {
 			char c = s.charAt(i);
 			switch (c) {
-				case '"' -> w.write("\\\"");
-				case '\\' -> w.write("\\\\");
-				case '\b' -> w.write("\\b");
-				case '\f' -> w.write("\\f");
-				case '\n' -> w.write("\\n");
-				case '\r' -> w.write("\\r");
-				case '\t' -> w.write("\\t");
-				default -> {
+				case '"':
+					w.write("\\\"");
+					break;
+				case '\\':
+					w.write("\\\\");
+					break;
+				case '\b':
+					w.write("\\b");
+					break;
+				case '\f':
+					w.write("\\f");
+					break;
+				case '\n':
+					w.write("\\n");
+					break;
+				case '\r':
+					w.write("\\r");
+					break;
+				case '\t':
+					w.write("\\t");
+					break;
+				default:
 					if (c < 0x20) {
 						w.write(String.format("\\u%04x", (int) c));
 					} else {
 						w.write(c);
 					}
-				}
+					break;
 			}
 		}
 		w.write('"');

@@ -1,4 +1,4 @@
-package ztest;
+package test;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -19,7 +19,7 @@ public class HelloFx extends Application {
         info += "  |  JavaFX " + System.getProperty("javafx.version");
         info += "\nJava home: " + System.getProperty("java.home");
         stage.setScene(new Scene(new StackPane(new Label(info)), 520, 160));
-        stage.setTitle("msfx - ztest.HelloFx");
+        stage.setTitle("msfx - test.HelloFx");
         stage.show();
     }
 

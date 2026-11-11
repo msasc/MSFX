@@ -3,30 +3,44 @@
     "configurations": [
         {
             "type": "java",
+            "name": "TestLexer",
+            "request": "launch",
+            "mainClass": "test.claude.sa.TestLexer",
+            "projectName": "msfx_2198cc6b"
+        },
+        {
+            "type": "java",
+            "name": "TestFunctionSQL",
+            "request": "launch",
+            "mainClass": "test.claude.TestFunctionSQL",
+            "projectName": "msfx_2198cc6b"
+        },
+        {
+            "type": "java",
             "name": "TestConnection",
             "request": "launch",
-            "mainClass": "ztest.db.TestConnection",
+            "mainClass": "test.db.TestConnection",
             "projectName": "msfx_2198cc6b"
         },
         {
             "type": "java",
             "name": "TestConnectionMSFX",
             "request": "launch",
-            "mainClass": "ztest.TestConnectionMSFX",
+            "mainClass": "test.TestConnectionMSFX",
             "projectName": "msfx_2198cc6b"
         },
         {
             "type": "java",
             "name": "TestLinkedHashMap",
             "request": "launch",
-            "mainClass": "ztest.TestLinkedHashMap",
+            "mainClass": "test.TestLinkedHashMap",
             "projectName": "msfx_2198cc6b"
         },
         {
             "type": "java",
             "name": "HelloFx",
             "request": "launch",
-            "mainClass": "ztest.HelloFx",
+            "mainClass": "test.HelloFx",
             "projectName": "msfx_2198cc6b"
         },
         {

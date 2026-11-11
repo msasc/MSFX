@@ -153,16 +153,26 @@ public class JSONEntry implements Copyable<JSONEntry> {
 			}
 		} else {
 			boolean valid = switch (type) {
-				case OBJECT -> value instanceof JSONObject;
-				case ARRAY -> value instanceof JSONArray;
-				case STRING -> value instanceof String;
-				case NUMBER -> value instanceof Number || value instanceof String;
-				case BOOLEAN -> value instanceof Boolean;
-				case NULL -> false;
-				case BINARY -> value instanceof byte[];
-				case DATE -> value instanceof LocalDate;
-				case TIME -> value instanceof LocalTime;
-				case DATETIME -> value instanceof LocalDateTime;
+				case OBJECT:
+					yield value instanceof JSONObject;
+				case ARRAY:
+					yield value instanceof JSONArray;
+				case STRING:
+					yield value instanceof String;
+				case NUMBER:
+					yield value instanceof Number || value instanceof String;
+				case BOOLEAN:
+					yield value instanceof Boolean;
+				case NULL:
+					yield false;
+				case BINARY:
+					yield value instanceof byte[];
+				case DATE:
+					yield value instanceof LocalDate;
+				case TIME:
+					yield value instanceof LocalTime;
+				case DATETIME:
+					yield value instanceof LocalDateTime;
 			};
 			if (!valid) {
 				throw new IllegalArgumentException("Invalid type " + type + " for " + value.getClass());

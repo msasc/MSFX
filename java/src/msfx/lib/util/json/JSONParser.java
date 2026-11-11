@@ -164,36 +164,30 @@ public class JSONParser {
 	 */
 	private JSONEntry readValue(int c) throws IOException {
 		switch (c) {
-			case '{' -> {
+			case '{':
 				JSONObject obj = parseObject();
 				JSONEntry extended = getExtendedTypeEntry(obj);
 				return extended != null ? extended : new JSONEntry(obj);
-			}
-			case '[' -> {
+			case '[':
 				return new JSONEntry(parseArray());
-			}
-			case '"' -> {
+			case '"':
 				return new JSONEntry(readString());
-			}
-			case 't' -> {
+			case 't':
 				readWord("true");
 				return new JSONEntry(true);
-			}
-			case 'f' -> {
+			case 'f':
 				readWord("false");
 				return new JSONEntry(false);
-			}
-			case 'n' -> {
+			case 'n':
 				readWord("null");
 				return new JSONEntry();
-			}
-			case -1 -> throw error("Unexpected end of input");
-			default -> {
+			case -1:
+				throw error("Unexpected end of input");
+			default:
 				if (c == '-' || (c >= '0' && c <= '9')) {
 					return new JSONEntry(readNumber(c));
 				}
 				throw error("Unexpected character '" + (char) c + "'");
-			}
 		}
 	}
 
@@ -240,15 +234,31 @@ public class JSONParser {
 			}
 			int n = nextChar();
 			switch (n) {
-				case '"' -> b.append('"');
-				case '\\' -> b.append('\\');
-				case '/' -> b.append('/');
-				case 'b' -> b.append('\b');
-				case 'f' -> b.append('\f');
-				case 'n' -> b.append('\n');
-				case 'r' -> b.append('\r');
-				case 't' -> b.append('\t');
-				case 'u' -> {
+				case '"':
+					b.append('"');
+					break;
+				case '\\':
+					b.append('\\');
+					break;
+				case '/':
+					b.append('/');
+					break;
+				case 'b':
+					b.append('\b');
+					break;
+				case 'f':
+					b.append('\f');
+					break;
+				case 'n':
+					b.append('\n');
+					break;
+				case 'r':
+					b.append('\r');
+					break;
+				case 't':
+					b.append('\t');
+					break;
+				case 'u':
 					int code = 0;
 					for (int i = 0; i < 4; i++) {
 						int digit = Character.digit(nextChar(), 16);
@@ -256,8 +266,9 @@ public class JSONParser {
 						code = code * 16 + digit;
 					}
 					b.append((char) code);
-				}
-				default -> throw error("Invalid escape sequence");
+					break;
+				default:
+					throw error("Invalid escape sequence");
 			}
 		}
 	}
@@ -282,13 +293,24 @@ public class JSONParser {
 		/* The string must comply with the type. */
 		String str = entry.getString();
 		try {
-			return switch (type) {
-				case BINARY -> new JSONEntry(HexFormat.of().parseHex(str));
-				case DATE -> new JSONEntry(LocalDate.parse(str));
-				case TIME -> new JSONEntry(LocalTime.parse(str));
-				case DATETIME -> new JSONEntry(LocalDateTime.parse(str));
-				default -> null;
+			JSONEntry extended = switch (type) {
+				case BINARY:
+					yield new JSONEntry(HexFormat.of().parseHex(str));
+				case DATE:
+					yield new JSONEntry(LocalDate.parse(str));
+				case TIME:
+					yield new JSONEntry(LocalTime.parse(str));
+				case DATETIME:
+					yield new JSONEntry(LocalDateTime.parse(str));
+				case OBJECT:
+				case ARRAY:
+				case STRING:
+				case NUMBER:
+				case BOOLEAN:
+				case NULL:
+					yield null;
 			};
+			return extended;
 		} catch (IllegalArgumentException | DateTimeParseException exc) {
 			return null;
 		}

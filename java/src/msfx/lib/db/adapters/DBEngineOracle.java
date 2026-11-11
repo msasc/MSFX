@@ -18,8 +18,10 @@ package msfx.lib.db.adapters;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 import msfx.lib.db.DBEngine;
+import msfx.lib.db.query.sa.Function;
 import msfx.lib.md.Column;
 import msfx.lib.md.Types;
 import msfx.lib.md.Value;
@@ -121,6 +123,145 @@ public class DBEngineOracle extends DBEngine {
 		return cond.toString();
 	}
 
+	/**
+	 * Translations that differ from the name of the function:
+	 * <ul>
+	 * <li>LENGTH: COALESCE(LENGTH(s), 0), because empty strings are null.</li>
+	 * <li>SUBSTRING: SUBSTR. LEFT(s, n): SUBSTR(s, 1, n).</li>
+	 * <li>RIGHT(s, n): SUBSTR(s, GREATEST(LENGTH(s) - (n) + 1, 1)), because
+	 * SUBSTR(s, -n) gives null when n is greater than the length.</li>
+	 * <li>POSITION: INSTR. CEILING: CEIL. TRUNCATE: TRUNC.</li>
+	 * <li>CURRENT_DATE: TRUNC(SYSDATE). CURRENT_TIMESTAMP: SYSTIMESTAMP.</li>
+	 * <li>YEAR, MONTH, DAY: EXTRACT. HOUR, MINUTE, SECOND: EXTRACT from the value
+	 * cast to TIMESTAMP, seconds without fraction.</li>
+	 * <li>ADD_DAYS(d, n): ((d) + NUMTODSINTERVAL(n, 'DAY')), which keeps the
+	 * fraction of timestamps.</li>
+	 * <li>DAYS_BETWEEN(d1, d2): (TRUNC(d2) - TRUNC(d1)).</li>
+	 * <li>TO_DATE: with the ISO format.</li>
+	 * <li>TO_TIMESTAMP: TO_TIMESTAMP(REPLACE(s, 'T', ' '), 'YYYY-MM-DD
+	 * HH24:MI:SS.FF'). Trailing elements missing in the string, like the
+	 * seconds, are taken as zero.</li>
+	 * </ul>
+	 * RIGHT writes its string argument twice.
+	 */
+	@Override
+	public String getFunctionSQL(Function function, List<String> arguments) {
+		String sql = switch (function) {
+			case COUNT:
+			case SUM:
+			case AVG:
+			case MIN:
+			case MAX:
+			case UPPER:
+			case LOWER:
+			case TRIM:
+			case LTRIM:
+			case RTRIM:
+			case REPLACE:
+			case LPAD:
+			case RPAD:
+			case ABS:
+			case SIGN:
+			case SQRT:
+			case FLOOR:
+			case ROUND:
+			case MOD:
+			case POWER:
+			case COALESCE:
+			case NULLIF:
+			case ADD_MONTHS:
+			case TO_NUMBER:
+				yield getCallSQL(function.name(), arguments);
+			case LENGTH:
+				yield getCallSQL("COALESCE", List.of(getCallSQL("LENGTH", arguments), "0"));
+			case SUBSTRING:
+				yield getCallSQL("SUBSTR", arguments);
+			case LEFT:
+				yield getCallSQL("SUBSTR", List.of(arguments.get(0), "1", arguments.get(1)));
+			case RIGHT: {
+				String s = arguments.get(0);
+				StringBuilder start = new StringBuilder();
+				start.append(getCallSQL("LENGTH", List.of(s)));
+				start.append(" - ");
+				start.append(getOperandSQL(arguments.get(1)));
+				start.append(" + 1");
+				yield getCallSQL("SUBSTR", List.of(s, getCallSQL("GREATEST", List.of(start.toString(), "1"))));
+			}
+			case POSITION:
+				yield getCallSQL("INSTR", arguments);
+			case CEILING:
+				yield getCallSQL("CEIL", arguments);
+			case TRUNCATE:
+				yield getCallSQL("TRUNC", arguments);
+			case CURRENT_DATE:
+				yield "TRUNC(SYSDATE)";
+			case CURRENT_TIMESTAMP:
+				yield "SYSTIMESTAMP";
+			case YEAR:
+			case MONTH:
+			case DAY:
+				yield getExtractSQL(function.name(), arguments.get(0));
+			case HOUR:
+			case MINUTE:
+				yield getExtractSQL(function.name(), getTimestampSQL(arguments.get(0)));
+			case SECOND:
+				yield getCallSQL("FLOOR", List.of(getExtractSQL("SECOND", getTimestampSQL(arguments.get(0)))));
+			case ADD_DAYS: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(getOperandSQL(arguments.get(0)));
+				b.append(" + ");
+				b.append(getCallSQL("NUMTODSINTERVAL", List.of(arguments.get(1), "'DAY'")));
+				b.append(")");
+				yield b.toString();
+			}
+			case DAYS_BETWEEN: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(getCallSQL("TRUNC", List.of(arguments.get(1))));
+				b.append(" - ");
+				b.append(getCallSQL("TRUNC", List.of(arguments.get(0))));
+				b.append(")");
+				yield b.toString();
+			}
+			case TO_STRING:
+				throw new UnsupportedOperationException("Not implemented yet");
+			case TO_DATE:
+				yield getCallSQL("TO_DATE", List.of(arguments.get(0), "'YYYY-MM-DD'"));
+			case TO_TIMESTAMP:
+				yield getCallSQL("TO_TIMESTAMP", List.of(getCallSQL("REPLACE", List.of(arguments.get(0), "'T'", "' '")), "'YYYY-MM-DD HH24:MI:SS.FF'"));
+		};
+		return sql;
+	}
+
+	/**
+	 * @param field The field: YEAR, MONTH, DAY, HOUR, MINUTE or SECOND.
+	 * @param expr  The date or timestamp expression.
+	 * @return EXTRACT(field FROM expr).
+	 */
+	private static String getExtractSQL(String field, String expr) {
+		StringBuilder b = new StringBuilder();
+		b.append("EXTRACT(");
+		b.append(field);
+		b.append(" FROM ");
+		b.append(expr);
+		b.append(")");
+		return b.toString();
+	}
+
+	/**
+	 * @param expr The date or timestamp expression.
+	 * @return CAST(expr AS TIMESTAMP), needed to extract hours, minutes and
+	 *         seconds from dates.
+	 */
+	private static String getTimestampSQL(String expr) {
+		StringBuilder b = new StringBuilder();
+		b.append("CAST(");
+		b.append(expr);
+		b.append(" AS TIMESTAMP)");
+		return b.toString();
+	}
+
 	@Override
 	protected String getURL(String cnString) {
 		StringBuilder url = new StringBuilder();
@@ -161,27 +302,39 @@ public class DBEngineOracle extends DBEngine {
 	private static String literal(Types type, Value value) {
 		StringBuilder literal = new StringBuilder();
 		switch (type) {
-			case BOOLEAN -> literal.append(value.getBoolean() ? "'1'" : "'0'");
-			case DECIMAL -> literal.append(value.getDecimal().toPlainString());
-			case DOUBLE -> literal.append(BigDecimal.valueOf(value.getDouble()).toPlainString());
-			case INTEGER, LONG -> literal.append(value.getLong());
-			case STRING -> {
+			case BOOLEAN:
+				literal.append(value.getBoolean() ? "'1'" : "'0'");
+				break;
+			case DECIMAL:
+				literal.append(value.getDecimal().toPlainString());
+				break;
+			case DOUBLE:
+				literal.append(BigDecimal.valueOf(value.getDouble()).toPlainString());
+				break;
+			case INTEGER:
+			case LONG:
+				literal.append(value.getLong());
+				break;
+			case STRING:
 				literal.append("N'");
 				literal.append(value.getString().replace("'", "''"));
 				literal.append("'");
-			}
-			case DATE -> {
+				break;
+			case DATE:
 				literal.append("DATE '");
 				literal.append(value.getDate());
 				literal.append("'");
-			}
-			case TIME -> throw new UnsupportedOperationException("TIME columns not yet supported in Oracle");
-			case DATETIME -> {
+				break;
+			case TIME:
+				throw new UnsupportedOperationException("TIME columns not yet supported in Oracle");
+			case DATETIME:
 				literal.append("TIMESTAMP '");
 				literal.append(DATETIME.format(value.getDateTime()));
 				literal.append("'");
-			}
-			case BINARY, OBJECT -> throw new UnsupportedOperationException("Not implemented yet");
+				break;
+			case BINARY:
+			case OBJECT:
+				throw new UnsupportedOperationException("Not implemented yet");
 		}
 		return literal.toString();
 	}

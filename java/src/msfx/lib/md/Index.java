@@ -165,11 +165,23 @@ public class Index implements Copyable<Index> {
      *         not be indexed.
      */
     private static boolean isLargeObject(Column column) {
-        return switch (column.getType()) {
-            case OBJECT -> true;
-            case STRING, BINARY -> column.getLength() <= 0 || column.getLength() > MAX_INDEXABLE_LENGTH;
-            default -> false;
+        boolean largeObject = switch (column.getType()) {
+            case OBJECT:
+                yield true;
+            case STRING:
+            case BINARY:
+                yield column.getLength() <= 0 || column.getLength() > MAX_INDEXABLE_LENGTH;
+            case BOOLEAN:
+            case DECIMAL:
+            case DOUBLE:
+            case INTEGER:
+            case LONG:
+            case DATE:
+            case TIME:
+            case DATETIME:
+                yield false;
         };
+        return largeObject;
     }
 
     /**

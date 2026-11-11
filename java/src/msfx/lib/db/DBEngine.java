@@ -17,6 +17,7 @@
 package msfx.lib.db;
 
 import msfx.lib.db.pool.ConnectionPool;
+import msfx.lib.db.query.sa.Function;
 import msfx.lib.md.Catalog;
 import msfx.lib.md.Column;
 import msfx.lib.md.Types;
@@ -364,4 +365,57 @@ public abstract class DBEngine {
 	 * @return The condition, that can be combined with AND and OR as is.
 	 */
 	public abstract String isNotNull(String expr, Types type);
+
+	/**
+	 * Returns a function call in the form of this database, with the behavior
+	 * described in {@link Function}.
+	 * <p>
+	 * The arguments are already written in SQL and their number has already been
+	 * validated. The single argument of an aggregate may be <code>*</code> or
+	 * start with <code>DISTINCT</code>, as in COUNT(*) or COUNT(DISTINCT x).
+	 * Translations written with operators are enclosed in parentheses, as are the
+	 * arguments they use as operands, so the result can be used as is in any
+	 * expression.
+	 *
+	 * @param function  The function.
+	 * @param arguments The arguments, written in SQL.
+	 * @return The SQL expression.
+	 */
+	public abstract String getFunctionSQL(Function function, List<String> arguments);
+
+	/**
+	 * Returns a function call written as name(argument, ...).
+	 *
+	 * @param name      The name of the function in this database.
+	 * @param arguments The arguments, written in SQL.
+	 * @return The SQL expression.
+	 */
+	protected final String getCallSQL(String name, List<String> arguments) {
+		StringBuilder call = new StringBuilder();
+		call.append(name);
+		call.append("(");
+		for (int i = 0; i < arguments.size(); i++) {
+			if (i > 0) {
+				call.append(", ");
+			}
+			call.append(arguments.get(i));
+		}
+		call.append(")");
+		return call.toString();
+	}
+
+	/**
+	 * Returns an expression enclosed in parentheses, to be used as the operand of
+	 * an operator whatever its own operators are.
+	 *
+	 * @param expr The expression, written in SQL.
+	 * @return The expression enclosed in parentheses.
+	 */
+	protected final String getOperandSQL(String expr) {
+		StringBuilder operand = new StringBuilder();
+		operand.append("(");
+		operand.append(expr);
+		operand.append(")");
+		return operand.toString();
+	}
 }

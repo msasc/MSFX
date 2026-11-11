@@ -40,9 +40,11 @@ works on every supported database:
 - **DDL**, complete: create and drop tables, columns, primary keys, indexes
   and schemas.
 - **SELECT**, in progress: the FROM clause is done; joins, conditions and the
-  select list will rely on a small SQL analyzer that validates hand-written
-  expressions against the tables involved and translates functions to each
-  database.
+  select list will rely on a small SQL analyzer (`db.query.sa`) that validates
+  hand-written expressions against the tables involved and translates them to
+  each database. Done so far: the vocabulary of keywords, operators and
+  functions, the translation of every function by each adapter, and the lexer.
+  The parser, the validator and the writer come next.
 - **INSERT, UPDATE and DELETE**: to come, with transactions that group them.
 
 ## Why portability matters
@@ -63,7 +65,7 @@ java/src/msfx/lib/util       utilities: properties, JSON, copying
 java/src/msfx/lib/md         metadata
 java/src/msfx/lib/db         engines, connections, pool, adapters
 java/src/msfx/lib/db/query   query generator
-java/src/ztest               manual tests against a local SQL Server
+java/src/test                manual tests against a local SQL Server
 java/lib                     JDBC drivers (the JDK and JavaFX are downloaded separately)
 java/doc                     generated Javadoc
 ```

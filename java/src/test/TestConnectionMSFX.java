@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ztest;
+package test;
 
 import msfx.lib.db.DBConnection;
 import msfx.lib.db.DBResultSet;

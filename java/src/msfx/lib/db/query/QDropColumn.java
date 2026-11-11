@@ -94,16 +94,18 @@ public class QDropColumn extends QBase {
 		StringBuilder sql = new StringBuilder();
 		sql.append("ALTER TABLE ");
 		sql.append(getQualifiedName(table));
-		sql.append(switch (db.getAdapter()) {
-			case SQLSERVER -> {
-				StringBuilder drop = new StringBuilder();
-				drop.append(" DROP CONSTRAINT IF EXISTS ");
-				drop.append(db.quote(DBEngineSQLServer.getDefaultConstraintName(table.getName(), column.getName())));
-				drop.append(", COLUMN ");
-				yield drop.toString();
+		String drop = switch (db.getAdapter()) {
+			case SQLSERVER: {
+				StringBuilder b = new StringBuilder();
+				b.append(" DROP CONSTRAINT IF EXISTS ");
+				b.append(db.quote(DBEngineSQLServer.getDefaultConstraintName(table.getName(), column.getName())));
+				b.append(", COLUMN ");
+				yield b.toString();
 			}
-			case ORACLE -> " DROP COLUMN ";
-		});
+			case ORACLE:
+				yield " DROP COLUMN ";
+		};
+		sql.append(drop);
 		sql.append(db.quote(column.getName()));
 		return sql.toString();
 	}

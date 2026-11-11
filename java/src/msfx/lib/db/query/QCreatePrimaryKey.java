@@ -91,10 +91,13 @@ public class QCreatePrimaryKey extends QBase {
 		sql.append(getQualifiedName(table));
 		sql.append(" ADD CONSTRAINT ");
 		sql.append(db.quote(pk.getName()));
-		sql.append(switch (db.getAdapter()) {
-			case SQLSERVER -> " PRIMARY KEY CLUSTERED (";
-			case ORACLE -> " PRIMARY KEY (";
-		});
+		String primaryKey = switch (db.getAdapter()) {
+			case SQLSERVER:
+				yield " PRIMARY KEY CLUSTERED (";
+			case ORACLE:
+				yield " PRIMARY KEY (";
+		};
+		sql.append(primaryKey);
 		List<Column> columns = pk.getColumns();
 		for (int i = 0; i < columns.size(); i++) {
 			if (i > 0) {

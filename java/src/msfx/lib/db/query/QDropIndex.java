@@ -102,24 +102,25 @@ public class QDropIndex extends QBase {
 		DBEngine db = getDBEngine();
 		StringBuilder sql = new StringBuilder();
 		sql.append("DROP INDEX ");
-		sql.append(switch (db.getAdapter()) {
-			case SQLSERVER -> {
-				StringBuilder drop = new StringBuilder();
-				drop.append(db.quote(index.getName()));
-				drop.append(" ON ");
-				drop.append(getQualifiedName(table));
-				yield drop.toString();
+		String drop = switch (db.getAdapter()) {
+			case SQLSERVER: {
+				StringBuilder b = new StringBuilder();
+				b.append(db.quote(index.getName()));
+				b.append(" ON ");
+				b.append(getQualifiedName(table));
+				yield b.toString();
 			}
-			case ORACLE -> {
-				StringBuilder drop = new StringBuilder();
+			case ORACLE: {
+				StringBuilder b = new StringBuilder();
 				if (table.getSchema() != null) {
-					drop.append(db.quote(table.getSchema()));
-					drop.append(".");
+					b.append(db.quote(table.getSchema()));
+					b.append(".");
 				}
-				drop.append(db.quote(index.getName()));
-				yield drop.toString();
+				b.append(db.quote(index.getName()));
+				yield b.toString();
 			}
-		});
+		};
+		sql.append(drop);
 		return sql.toString();
 	}
 }

@@ -1,4 +1,4 @@
-package ztest;
+package test;
 
 public class TestString {
 
