@@ -16,6 +16,8 @@
 
 package msfx.lib.db.query;
 
+import java.util.Objects;
+
 import msfx.lib.md.Table;
 
 /**
@@ -30,34 +32,31 @@ import msfx.lib.md.Table;
 public class QJoin extends QBase {
 
 	/**
-	 * Joined table and its alias.
+	 * Joined table.
 	 */
-	private final QFrom.Entry entry;
+	private final Table table;
+	/**
+	 * Alias of the joined table, or null to use the name of the table.
+	 */
+	private final String alias;
 	/**
 	 * ON conditions.
 	 */
 	private final QWhere on;
 
 	/**
-	 * Constructor. Adds the table to the tables of the statement.
+	 * Constructor.
 	 *
-	 * @param from  The tables of the statement.
+	 * @param from  The FROM clause of the statement.
 	 * @param table The joined table.
 	 * @param alias The alias, or null to use the name of the table.
-	 * @throws NullPointerException     If the table is null.
-	 * @throws IllegalArgumentException If the alias is duplicated.
+	 * @throws NullPointerException If the table is null.
 	 */
 	QJoin(QFrom from, Table table, String alias) {
 		super(from.getDBEngine());
-		this.entry = from.add(table, alias);
+		this.table = Objects.requireNonNull(table, "Table can not be null");
+		this.alias = alias;
 		this.on = new QWhere(from);
-	}
-
-	/**
-	 * @return The joined table and its alias.
-	 */
-	public QFrom.Entry getEntry() {
-		return entry;
 	}
 
 	/**

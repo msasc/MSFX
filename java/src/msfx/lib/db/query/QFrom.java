@@ -16,18 +16,13 @@
 
 package msfx.lib.db.query;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 import msfx.lib.db.DBEngine;
 import msfx.lib.md.Table;
 
 /**
- * FROM part of a statement: the tables involved, each one with its alias. The
- * first table is the main table of the statement, the following ones are added
- * by joins. It is shared by all the parts of the statement, that validate their
- * column references against it.
+ * FROM clause of a statement: the master table and its alias.
  * <p>
  * Created only by its statement.
  *
@@ -36,63 +31,48 @@ import msfx.lib.md.Table;
 public class QFrom extends QBase {
 
 	/**
-	 * A table involved in the statement and its alias.
-	 *
-	 * @param table The table.
-	 * @param alias The alias, the name of the table when not set explicitly.
+	 * The master table.
 	 */
-	public record Entry(Table table, String alias) {
-	}
-
+	private final Table table;
 	/**
-	 * Tables and aliases, the main table first.
+	 * The alias of the master table, or null if it has none, as usual in
+	 * deletes.
 	 */
-	private final List<Entry> entries = new ArrayList<>();
+	private final String alias;
 
 	/**
 	 * Constructor.
 	 *
 	 * @param db    The database engine.
-	 * @param table The main table.
-	 * @param alias The alias, or null to use the name of the table.
+	 * @param table The master table.
+	 * @param alias The alias, or null for none.
 	 * @throws NullPointerException     If the engine or the table is null.
-	 * @throws IllegalArgumentException If the alias is duplicated.
+	 * @throws IllegalArgumentException If the alias is blank.
 	 */
 	QFrom(DBEngine db, Table table, String alias) {
 		super(db);
-		add(table, alias);
-	}
-
-	/**
-	 * Adds a table. Aliases must be unique ignoring case, so a table involved
-	 * more than once needs explicit aliases.
-	 *
-	 * @param table The table.
-	 * @param alias The alias, or null to use the name of the table.
-	 * @return The entry added.
-	 * @throws NullPointerException     If the table is null.
-	 * @throws IllegalArgumentException If the alias is duplicated.
-	 */
-	Entry add(Table table, String alias) {
-		Objects.requireNonNull(table, "Table can not be null");
-		String name = (alias != null ? alias : table.getName());
-		for (Entry entry : entries) {
-			if (entry.alias().equalsIgnoreCase(name)) {
-				StringBuilder msg = new StringBuilder();
-				msg.append("Duplicate alias ");
-				msg.append(name);
-				throw new IllegalArgumentException(msg.toString());
-			}
+		this.table = Objects.requireNonNull(table, "Table can not be null");
+		if (alias != null && alias.isBlank()) {
+			throw new IllegalArgumentException("Alias can not be blank");
 		}
-		Entry entry = new Entry(table, name);
-		entries.add(entry);
-		return entry;
+		this.alias = alias;
 	}
 
 	/**
-	 * @return The tables and aliases, the main table first.
+	 * Returns the clause: FROM table [alias]. The alias is written only when set,
+	 * without AS, which Oracle does not accept for tables.
+	 *
+	 * @return The FROM clause.
 	 */
-	public List<Entry> getEntries() {
-		return List.copyOf(entries);
+	String toSQL() {
+		DBEngine db = getDBEngine();
+		StringBuilder sql = new StringBuilder();
+		sql.append("FROM ");
+		sql.append(getQualifiedName(table));
+		if (alias != null) {
+			sql.append(" ");
+			sql.append(db.quote(alias));
+		}
+		return sql.toString();
 	}
 }
