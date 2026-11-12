@@ -16,16 +16,19 @@
 
 package msfx.lib.db.query.sa;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import msfx.lib.md.Types;
 import msfx.lib.md.Value;
 
 /**
  * A node of the tree of a hand-written expression, as built by the
  * {@link Parser}.
  * <p>
- * Nodes are created only through the static method of their kind, that sets
- * the fields of that kind and leaves the rest null, false or empty.
+ * Nodes are created only by the parser, through the static method of their
+ * kind, that sets the fields of that kind and leaves the rest null, false or
+ * empty.
  *
  * @author Miquel Sas
  */
@@ -80,8 +83,8 @@ public class Node {
 	 * @param name     The column name.
 	 * @return The node.
 	 */
-	public static Node column(int position, String alias, String name) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node column(int position, String alias, String name) {
+		return new Node(Kind.COLUMN, position, List.of(), null, null, alias, name, null, 0, false, false);
 	}
 
 	/**
@@ -91,8 +94,8 @@ public class Node {
 	 * @param value    The value, a number or a string.
 	 * @return The node.
 	 */
-	public static Node literal(int position, Value value) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node literal(int position, Value value) {
+		return new Node(Kind.LITERAL, position, List.of(), null, null, null, null, value, 0, false, false);
 	}
 
 	/**
@@ -103,8 +106,8 @@ public class Node {
 	 *                 that is also the index of its value.
 	 * @return The node.
 	 */
-	public static Node parameter(int position, int index) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node parameter(int position, int index) {
+		return new Node(Kind.PARAMETER, position, List.of(), null, null, null, null, null, index, false, false);
 	}
 
 	/**
@@ -113,8 +116,8 @@ public class Node {
 	 * @param position The position.
 	 * @return The node.
 	 */
-	public static Node star(int position) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node star(int position) {
+		return new Node(Kind.STAR, position, List.of(), null, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -127,8 +130,8 @@ public class Node {
 	 * @param arguments The arguments.
 	 * @return The node.
 	 */
-	public static Node call(int position, Function function, boolean distinct, List<Node> arguments) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node call(int position, Function function, boolean distinct, List<Node> arguments) {
+		return new Node(Kind.CALL, position, List.copyOf(arguments), null, function, null, null, null, 0, distinct, false);
 	}
 
 	/**
@@ -139,8 +142,8 @@ public class Node {
 	 * @param operand  The operand.
 	 * @return The node.
 	 */
-	public static Node unary(int position, Operator operator, Node operand) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node unary(int position, Operator operator, Node operand) {
+		return new Node(Kind.UNARY, position, List.of(operand), operator, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -152,8 +155,8 @@ public class Node {
 	 * @param right    The right operand.
 	 * @return The node.
 	 */
-	public static Node binary(int position, Operator operator, Node left, Node right) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node binary(int position, Operator operator, Node left, Node right) {
+		return new Node(Kind.BINARY, position, List.of(left, right), operator, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -163,8 +166,8 @@ public class Node {
 	 * @param conditions The conditions, two or more.
 	 * @return The node.
 	 */
-	public static Node and(int position, List<Node> conditions) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node and(int position, List<Node> conditions) {
+		return new Node(Kind.AND, position, List.copyOf(conditions), null, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -174,8 +177,8 @@ public class Node {
 	 * @param conditions The conditions, two or more.
 	 * @return The node.
 	 */
-	public static Node or(int position, List<Node> conditions) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node or(int position, List<Node> conditions) {
+		return new Node(Kind.OR, position, List.copyOf(conditions), null, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -185,8 +188,8 @@ public class Node {
 	 * @param condition The condition.
 	 * @return The node.
 	 */
-	public static Node not(int position, Node condition) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node not(int position, Node condition) {
+		return new Node(Kind.NOT, position, List.of(condition), null, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -197,8 +200,8 @@ public class Node {
 	 * @param operand  The operand.
 	 * @return The node.
 	 */
-	public static Node isNull(int position, boolean negated, Node operand) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node isNull(int position, boolean negated, Node operand) {
+		return new Node(Kind.IS_NULL, position, List.of(operand), null, null, null, null, null, 0, false, negated);
 	}
 
 	/**
@@ -210,8 +213,11 @@ public class Node {
 	 * @param values   The list of values, one or more.
 	 * @return The node.
 	 */
-	public static Node in(int position, boolean negated, Node operand, List<Node> values) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node in(int position, boolean negated, Node operand, List<Node> values) {
+		List<Node> children = new ArrayList<>();
+		children.add(operand);
+		children.addAll(values);
+		return new Node(Kind.IN, position, List.copyOf(children), null, null, null, null, null, 0, false, negated);
 	}
 
 	/**
@@ -224,8 +230,8 @@ public class Node {
 	 * @param high     The high limit.
 	 * @return The node.
 	 */
-	public static Node between(int position, boolean negated, Node operand, Node low, Node high) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node between(int position, boolean negated, Node operand, Node low, Node high) {
+		return new Node(Kind.BETWEEN, position, List.of(operand, low, high), null, null, null, null, null, 0, false, negated);
 	}
 
 	/**
@@ -237,8 +243,8 @@ public class Node {
 	 * @param pattern  The pattern.
 	 * @return The node.
 	 */
-	public static Node like(int position, boolean negated, Node operand, Node pattern) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node like(int position, boolean negated, Node operand, Node pattern) {
+		return new Node(Kind.LIKE, position, List.of(operand, pattern), null, null, null, null, null, 0, false, negated);
 	}
 
 	/**
@@ -250,8 +256,14 @@ public class Node {
 	 * @param otherwise  The result of the ELSE.
 	 * @return The node.
 	 */
-	public static Node caseOf(int position, List<Node> conditions, List<Node> results, Node otherwise) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node caseOf(int position, List<Node> conditions, List<Node> results, Node otherwise) {
+		List<Node> children = new ArrayList<>();
+		for (int i = 0; i < conditions.size(); i++) {
+			children.add(conditions.get(i));
+			children.add(results.get(i));
+		}
+		children.add(otherwise);
+		return new Node(Kind.CASE, position, List.copyOf(children), null, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -261,8 +273,8 @@ public class Node {
 	 * @param content  The content.
 	 * @return The node.
 	 */
-	public static Node group(int position, Node content) {
-		throw new UnsupportedOperationException("Not implemented yet");
+	static Node group(int position, Node content) {
+		return new Node(Kind.GROUP, position, List.of(content), null, null, null, null, null, 0, false, false);
 	}
 
 	/**
@@ -456,16 +468,196 @@ public class Node {
 	 * @return A boolean.
 	 */
 	public boolean isCondition() {
-		throw new UnsupportedOperationException("Not implemented yet");
+		boolean condition = switch (kind) {
+			case COLUMN:
+			case LITERAL:
+			case PARAMETER:
+			case STAR:
+			case CALL:
+			case UNARY:
+			case CASE:
+				yield false;
+			case BINARY:
+				yield operator.isComparison();
+			case AND:
+			case OR:
+			case NOT:
+			case IS_NULL:
+			case IN:
+			case BETWEEN:
+			case LIKE:
+				yield true;
+			case GROUP:
+				yield children.get(0).isCondition();
+		};
+		return condition;
 	}
 
 	/**
-	 * Returns the node fully parenthesized, to read in tests and while debugging.
+	 * Returns the node with every operation between parentheses, to read the
+	 * precedence in tests and while debugging. A GROUP adds its own
+	 * parentheses, so that a group written by hand shows as double.
 	 *
 	 * @return A string representation.
 	 */
 	@Override
 	public String toString() {
-		throw new UnsupportedOperationException("Not implemented yet");
+		String text = switch (kind) {
+			case COLUMN: {
+				StringBuilder b = new StringBuilder();
+				if (alias != null) {
+					b.append(alias);
+					b.append(".");
+				}
+				b.append(name);
+				yield b.toString();
+			}
+			case LITERAL: {
+				StringBuilder b = new StringBuilder();
+				if (value.getType() == Types.STRING) {
+					b.append("'");
+					b.append(value.getString().replace("'", "''"));
+					b.append("'");
+				} else {
+					b.append(value.getDecimal().toPlainString());
+				}
+				yield b.toString();
+			}
+			case PARAMETER: {
+				StringBuilder b = new StringBuilder();
+				b.append("?");
+				b.append(index);
+				yield b.toString();
+			}
+			case STAR:
+				yield "*";
+			case CALL: {
+				StringBuilder b = new StringBuilder();
+				b.append(function.name());
+				b.append("(");
+				if (distinct) {
+					b.append("DISTINCT ");
+				}
+				appendList(b, children, ", ");
+				b.append(")");
+				yield b.toString();
+			}
+			case UNARY: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(operator.getSymbol());
+				b.append(children.get(0));
+				b.append(")");
+				yield b.toString();
+			}
+			case BINARY: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(children.get(0));
+				b.append(" ");
+				b.append(operator.getSymbol());
+				b.append(" ");
+				b.append(children.get(1));
+				b.append(")");
+				yield b.toString();
+			}
+			case AND: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				appendList(b, children, " AND ");
+				b.append(")");
+				yield b.toString();
+			}
+			case OR: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				appendList(b, children, " OR ");
+				b.append(")");
+				yield b.toString();
+			}
+			case NOT: {
+				StringBuilder b = new StringBuilder();
+				b.append("(NOT ");
+				b.append(children.get(0));
+				b.append(")");
+				yield b.toString();
+			}
+			case IS_NULL: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(children.get(0));
+				b.append(negated ? " IS NOT NULL" : " IS NULL");
+				b.append(")");
+				yield b.toString();
+			}
+			case IN: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(children.get(0));
+				b.append(negated ? " NOT IN (" : " IN (");
+				appendList(b, children.subList(1, children.size()), ", ");
+				b.append("))");
+				yield b.toString();
+			}
+			case BETWEEN: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(children.get(0));
+				b.append(negated ? " NOT BETWEEN " : " BETWEEN ");
+				b.append(children.get(1));
+				b.append(" AND ");
+				b.append(children.get(2));
+				b.append(")");
+				yield b.toString();
+			}
+			case LIKE: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(children.get(0));
+				b.append(negated ? " NOT LIKE " : " LIKE ");
+				b.append(children.get(1));
+				b.append(")");
+				yield b.toString();
+			}
+			case CASE: {
+				StringBuilder b = new StringBuilder();
+				b.append("CASE");
+				int last = children.size() - 1;
+				for (int i = 0; i < last; i += 2) {
+					b.append(" WHEN ");
+					b.append(children.get(i));
+					b.append(" THEN ");
+					b.append(children.get(i + 1));
+				}
+				b.append(" ELSE ");
+				b.append(children.get(last));
+				b.append(" END");
+				yield b.toString();
+			}
+			case GROUP: {
+				StringBuilder b = new StringBuilder();
+				b.append("(");
+				b.append(children.get(0));
+				b.append(")");
+				yield b.toString();
+			}
+		};
+		return text;
+	}
+
+	/**
+	 * Appends the nodes separated by the separator.
+	 *
+	 * @param b         The builder.
+	 * @param nodes     The nodes.
+	 * @param separator The separator.
+	 */
+	private static void appendList(StringBuilder b, List<Node> nodes, String separator) {
+		for (int i = 0; i < nodes.size(); i++) {
+			if (i > 0) {
+				b.append(separator);
+			}
+			b.append(nodes.get(i));
+		}
 	}
 }

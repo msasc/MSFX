@@ -16,7 +16,9 @@
 
 package msfx.lib.db.adapters;
 
-import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -309,7 +311,7 @@ public class DBEngineSQLServer extends DBEngine {
 			suffix.append("CONSTRAINT ");
 			suffix.append(quote(getDefaultConstraintName(table.getName(), col.getName())));
 			suffix.append(" DEFAULT ");
-			suffix.append(literal(col.getType(), value));
+			suffix.append(getLiteralSQL(value));
 		}
 		if (!col.isNullable()) {
 			if (!suffix.isEmpty()) {
@@ -338,52 +340,70 @@ public class DBEngineSQLServer extends DBEngine {
 	}
 
 	/**
-	 * @param type  The type of the column.
-	 * @param value The value, not null.
-	 * @return The value as an SQL literal. Booleans are stored as '1' and '0',
-	 *         as the driver converts them.
+	 * Booleans are stored as '1' and '0', as the driver converts them.
 	 */
-	private static String literal(Types type, Value value) {
+	@Override
+	public String getLiteralSQL(boolean bool) {
+		return bool ? "'1'" : "'0'";
+	}
+
+	/**
+	 * Strings are written as Unicode literals, N'...'.
+	 */
+	@Override
+	public String getLiteralSQL(String str) {
 		StringBuilder literal = new StringBuilder();
-		switch (type) {
-			case BOOLEAN:
-				literal.append(value.getBoolean() ? "'1'" : "'0'");
-				break;
-			case DECIMAL:
-				literal.append(value.getDecimal().toPlainString());
-				break;
-			case DOUBLE:
-				literal.append(BigDecimal.valueOf(value.getDouble()).toPlainString());
-				break;
-			case INTEGER:
-			case LONG:
-				literal.append(value.getLong());
-				break;
-			case STRING:
-				literal.append("N'");
-				literal.append(value.getString().replace("'", "''"));
-				literal.append("'");
-				break;
-			case DATE:
-				literal.append("'");
-				literal.append(value.getDate());
-				literal.append("'");
-				break;
-			case TIME:
-				literal.append("'");
-				literal.append(value.getTime());
-				literal.append("'");
-				break;
-			case DATETIME:
-				literal.append("'");
-				literal.append(DATETIME.format(value.getDateTime()));
-				literal.append("'");
-				break;
-			case BINARY:
-			case OBJECT:
-				throw new UnsupportedOperationException("Not implemented yet");
-		}
+		literal.append("N'");
+		literal.append(str.replace("'", "''"));
+		literal.append("'");
 		return literal.toString();
+	}
+
+	/**
+	 * Dates are written as 'yyyy-MM-dd', that SQL Server reads whatever the
+	 * language settings of the session.
+	 */
+	@Override
+	public String getLiteralSQL(LocalDate date) {
+		StringBuilder literal = new StringBuilder();
+		literal.append("'");
+		literal.append(date);
+		literal.append("'");
+		return literal.toString();
+	}
+
+	/**
+	 * Times are written as 'HH:mm[:ss[.fraction]]'.
+	 */
+	@Override
+	public String getLiteralSQL(LocalTime time) {
+		StringBuilder literal = new StringBuilder();
+		literal.append("'");
+		literal.append(time);
+		literal.append("'");
+		return literal.toString();
+	}
+
+	/**
+	 * Dates and times are written as 'yyyy-MM-dd HH:mm:ss.fffffff', the precision
+	 * of DATETIME2.
+	 */
+	@Override
+	public String getLiteralSQL(LocalDateTime dateTime) {
+		StringBuilder literal = new StringBuilder();
+		literal.append("'");
+		literal.append(DATETIME.format(dateTime));
+		literal.append("'");
+		return literal.toString();
+	}
+
+	/**
+	 * Concatenation is written with CONCAT, that takes nulls as empty strings and
+	 * converts numbers, as the || of Oracle does. The operator + does neither.
+	 */
+	@Override
+	public String getConcatSQL(List<String> operands) {
+		return getCallSQL("CONCAT", operands);
 	}
 
 	@Override

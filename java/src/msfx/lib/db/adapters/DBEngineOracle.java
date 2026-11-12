@@ -16,7 +16,9 @@
 
 package msfx.lib.db.adapters;
 
-import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -282,7 +284,7 @@ public class DBEngineOracle extends DBEngine {
 		Value value = col.getDefaultValue();
 		if (value != null && !value.isNull() && !(string && value.getString().isEmpty())) {
 			suffix.append("DEFAULT ");
-			suffix.append(literal(col.getType(), value));
+			suffix.append(getLiteralSQL(value));
 		}
 		if (!col.isNullable() && !string) {
 			if (!suffix.isEmpty()) {
@@ -294,49 +296,73 @@ public class DBEngineOracle extends DBEngine {
 	}
 
 	/**
-	 * @param type  The type of the column.
-	 * @param value The value, not null.
-	 * @return The value as an SQL literal. Booleans are stored as '1' and '0',
-	 *         as the driver converts them.
+	 * Booleans are stored as '1' and '0', as the driver converts them.
 	 */
-	private static String literal(Types type, Value value) {
+	@Override
+	public String getLiteralSQL(boolean bool) {
+		return bool ? "'1'" : "'0'";
+	}
+
+	/**
+	 * Strings are written as national literals, N'...'.
+	 */
+	@Override
+	public String getLiteralSQL(String str) {
 		StringBuilder literal = new StringBuilder();
-		switch (type) {
-			case BOOLEAN:
-				literal.append(value.getBoolean() ? "'1'" : "'0'");
-				break;
-			case DECIMAL:
-				literal.append(value.getDecimal().toPlainString());
-				break;
-			case DOUBLE:
-				literal.append(BigDecimal.valueOf(value.getDouble()).toPlainString());
-				break;
-			case INTEGER:
-			case LONG:
-				literal.append(value.getLong());
-				break;
-			case STRING:
-				literal.append("N'");
-				literal.append(value.getString().replace("'", "''"));
-				literal.append("'");
-				break;
-			case DATE:
-				literal.append("DATE '");
-				literal.append(value.getDate());
-				literal.append("'");
-				break;
-			case TIME:
-				throw new UnsupportedOperationException("TIME columns not yet supported in Oracle");
-			case DATETIME:
-				literal.append("TIMESTAMP '");
-				literal.append(DATETIME.format(value.getDateTime()));
-				literal.append("'");
-				break;
-			case BINARY:
-			case OBJECT:
-				throw new UnsupportedOperationException("Not implemented yet");
-		}
+		literal.append("N'");
+		literal.append(str.replace("'", "''"));
+		literal.append("'");
 		return literal.toString();
+	}
+
+	/**
+	 * Dates are written as ANSI literals, DATE 'yyyy-MM-dd'.
+	 */
+	@Override
+	public String getLiteralSQL(LocalDate date) {
+		StringBuilder literal = new StringBuilder();
+		literal.append("DATE '");
+		literal.append(date);
+		literal.append("'");
+		return literal.toString();
+	}
+
+	/**
+	 * Oracle has no time type.
+	 */
+	@Override
+	public String getLiteralSQL(LocalTime time) {
+		throw new UnsupportedOperationException("TIME columns not yet supported in Oracle");
+	}
+
+	/**
+	 * Dates and times are written as ANSI literals, TIMESTAMP 'yyyy-MM-dd
+	 * HH:mm:ss.fffffffff'.
+	 */
+	@Override
+	public String getLiteralSQL(LocalDateTime dateTime) {
+		StringBuilder literal = new StringBuilder();
+		literal.append("TIMESTAMP '");
+		literal.append(DATETIME.format(dateTime));
+		literal.append("'");
+		return literal.toString();
+	}
+
+	/**
+	 * Concatenation is written with ||, that takes nulls as empty strings.
+	 */
+	@Override
+	public String getConcatSQL(List<String> operands) {
+		StringBuilder concat = new StringBuilder();
+		concat.append("(");
+		for (int i = 0; i < operands.size(); i++) {
+			if (i > 0) {
+				concat.append(" || ");
+			}
+			concat.append(operands.get(i));
+		}
+		concat.append(")");
+		return concat.toString();
 	}
 
 	@Override

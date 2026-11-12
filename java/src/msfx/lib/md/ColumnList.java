@@ -180,6 +180,23 @@ public class ColumnList implements Iterable<Column> {
 	}
 
 	/**
+	 * Returns the column with the alias compared ignoring case. Aliases that
+	 * differ only in case are rejected when added, so the result is never
+	 * ambiguous.
+	 *
+	 * @param alias The alias, in any case.
+	 * @return The column, or null if not found.
+	 */
+	public Column getIgnoreCase(String alias) {
+		for (Map.Entry<String, Column> entry : columnsByAlias.entrySet()) {
+			if (entry.getKey().equalsIgnoreCase(alias)) {
+				return entry.getValue();
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * @param index The index.
 	 * @return The column at the index.
 	 * @throws IndexOutOfBoundsException If the index is out of range.

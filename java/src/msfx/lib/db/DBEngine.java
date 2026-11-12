@@ -21,11 +21,16 @@ import msfx.lib.db.query.sa.Function;
 import msfx.lib.md.Catalog;
 import msfx.lib.md.Column;
 import msfx.lib.md.Types;
+import msfx.lib.md.Value;
 import msfx.lib.util.Properties;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
@@ -365,6 +370,131 @@ public abstract class DBEngine {
 	 * @return The condition, that can be combined with AND and OR as is.
 	 */
 	public abstract String isNotNull(String expr, Types type);
+
+	/**
+	 * Returns a value written as an SQL literal of this database, calling the
+	 * method of its type.
+	 *
+	 * @param value The value.
+	 * @return The literal.
+	 * @throws IllegalArgumentException      If the value is null: a null has no
+	 *                                       literal, and comparing with it never
+	 *                                       matches; use IS NULL.
+	 * @throws UnsupportedOperationException If the value is a binary or a JSON
+	 *                                       object.
+	 */
+	public final String getLiteralSQL(Value value) {
+		if (value == null || value.isNull()) {
+			throw new IllegalArgumentException("A null value has no literal, use IS NULL");
+		}
+		String literal = switch (value.getType()) {
+			case BOOLEAN:
+				yield getLiteralSQL(value.getBoolean());
+			case DECIMAL:
+				yield getLiteralSQL(value.getDecimal());
+			case DOUBLE:
+				yield getLiteralSQL(value.getDouble());
+			case INTEGER:
+			case LONG:
+				yield getLiteralSQL(value.getLong());
+			case DATE:
+				yield getLiteralSQL(value.getDate());
+			case TIME:
+				yield getLiteralSQL(value.getTime());
+			case DATETIME:
+				yield getLiteralSQL(value.getDateTime());
+			case STRING:
+				yield getLiteralSQL(value.getString());
+			case BINARY:
+			case OBJECT:
+				throw new UnsupportedOperationException("Not implemented yet");
+		};
+		return literal;
+	}
+
+	/**
+	 * Returns an integer number as an SQL literal, the same in every database.
+	 *
+	 * @param number The number.
+	 * @return The literal.
+	 */
+	public final String getLiteralSQL(long number) {
+		return Long.toString(number);
+	}
+
+	/**
+	 * Returns a decimal number as an SQL literal, without exponent, the same in
+	 * every database.
+	 *
+	 * @param number The number.
+	 * @return The literal.
+	 */
+	public final String getLiteralSQL(BigDecimal number) {
+		return number.toPlainString();
+	}
+
+	/**
+	 * Returns a double as an SQL literal, without exponent, the same in every
+	 * database.
+	 *
+	 * @param number The number.
+	 * @return The literal.
+	 */
+	public final String getLiteralSQL(double number) {
+		return BigDecimal.valueOf(number).toPlainString();
+	}
+
+	/**
+	 * Returns a boolean as an SQL literal, as it is stored by this database.
+	 *
+	 * @param bool The boolean.
+	 * @return The literal.
+	 */
+	public abstract String getLiteralSQL(boolean bool);
+
+	/**
+	 * Returns a string as an SQL literal of this database, with the quotes it
+	 * contains escaped.
+	 *
+	 * @param str The string, not null.
+	 * @return The literal.
+	 */
+	public abstract String getLiteralSQL(String str);
+
+	/**
+	 * Returns a date as an SQL literal of this database.
+	 *
+	 * @param date The date.
+	 * @return The literal.
+	 */
+	public abstract String getLiteralSQL(LocalDate date);
+
+	/**
+	 * Returns a time as an SQL literal of this database.
+	 *
+	 * @param time The time.
+	 * @return The literal.
+	 * @throws UnsupportedOperationException If the database has no time type.
+	 */
+	public abstract String getLiteralSQL(LocalTime time);
+
+	/**
+	 * Returns a date and time as an SQL literal of this database.
+	 *
+	 * @param dateTime The date and time.
+	 * @return The literal.
+	 */
+	public abstract String getLiteralSQL(LocalDateTime dateTime);
+
+	/**
+	 * Returns the concatenation of two or more strings in the form of this
+	 * database. A null operand is taken as an empty string, as Oracle does.
+	 *
+	 * @param operands The operands, already written in SQL.
+	 * @return The SQL expression, enclosed in parentheses or written as a
+	 *         function call, so that it can be used as is in any expression.
+	 */
+	public abstract String getConcatSQL(List<String> operands);
 
 	/**
 	 * Returns a function call in the form of this database, with the behavior

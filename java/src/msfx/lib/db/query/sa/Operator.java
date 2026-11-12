@@ -96,4 +96,28 @@ public enum Operator {
 	public String getSymbol() {
 		return symbol;
 	}
+
+	/**
+	 * Returns whether the operator is a comparison, that gives a condition.
+	 *
+	 * @return A boolean.
+	 */
+	public boolean isComparison() {
+		boolean comparison = switch (this) {
+			case EQUAL:
+			case NOT_EQUAL:
+			case GREATER:
+			case GREATER_EQUAL:
+			case LESS:
+			case LESS_EQUAL:
+				yield true;
+			case PLUS:
+			case MINUS:
+			case MULTIPLY:
+			case DIVIDE:
+			case CONCAT:
+				yield false;
+		};
+		return comparison;
+	}
 }

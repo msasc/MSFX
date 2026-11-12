@@ -13,8 +13,9 @@ desktop and task concurrency packages) must be as well defined as possible.
 - `java/src/msfx/lib/db`: DBEngine, connections, statements, result sets, the
   connection pool (`db.pool`) and the adapters (`db.adapters`).
 - `java/src/msfx/lib/db/query`: the query generator, one class per statement.
-  `db.query.sa`: the syntax analyzer of hand-written expressions (Token,
-  Lexer, Keyword, Operator, Function).
+  `db.query.sa`: the syntax analyzer of hand-written expressions. Lexer
+  (Token), Parser (Node), Validator (Clause, Analysis) and Writer, with the
+  vocabulary in Keyword, Operator and Function.
 - `java/src/test`: manual tests, run with `main`. Claude writes its tests in
   `test.claude`, in sub-packages as needed, never as scratch files.
 - `java/lib`: JDK and JavaFX (not in Git, downloaded separately) and the JDBC

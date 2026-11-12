@@ -42,9 +42,11 @@ works on every supported database:
 - **SELECT**, in progress: the FROM clause is done; joins, conditions and the
   select list will rely on a small SQL analyzer (`db.query.sa`) that validates
   hand-written expressions against the tables involved and translates them to
-  each database. Done so far: the vocabulary of keywords, operators and
-  functions, the translation of every function by each adapter, and the lexer.
-  The parser, the validator and the writer come next.
+  each database. The analyzer is complete: the vocabulary of keywords,
+  operators and functions, the lexer, the parser, the validator of tables,
+  columns and aggregates by clause, and the writer, that quotes names and
+  translates functions, concatenations and literals for each database. Its use
+  in joins, conditions and the select list comes next.
 - **INSERT, UPDATE and DELETE**: to come, with transactions that group them.
 
 ## Why portability matters
