@@ -20,7 +20,9 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
+import msfx.lib.db.DBEngine;
 import msfx.lib.md.Column;
+import msfx.lib.md.Table;
 import msfx.lib.md.Value;
 
 /**
@@ -31,6 +33,38 @@ import msfx.lib.md.Value;
  * @author Miquel Sas
  */
 public class Analysis {
+
+	/**
+	 * Parses and validates an expression: as a value for SELECT, as a condition
+	 * for the other clauses. This is the entry point of the query classes.
+	 *
+	 * @param expression The expression.
+	 * @param clause     The clause.
+	 * @param tables     The tables in scope, by alias.
+	 * @param values     The values of the placeholders, empty if none.
+	 * @param selectList The validated expressions of the select list, used only
+	 *                   by HAVING, empty otherwise.
+	 * @return The analysis.
+	 * @throws SyntaxException If the expression is wrong, at the position of the
+	 *                         error.
+	 */
+	public static Analysis analyze(
+			String expression,
+			Clause clause,
+			Map<String, Table> tables,
+			List<Value> values,
+			List<Analysis> selectList) {
+		Parser parser = new Parser(expression);
+		Node root = switch (clause) {
+			case SELECT:
+				yield parser.parseExpression();
+			case ON:
+			case WHERE:
+			case HAVING:
+				yield parser.parseCondition();
+		};
+		return new Validator(expression, root, clause, tables, values, selectList).validate();
+	}
 
 	/**
 	 * The expression as written.
@@ -139,6 +173,16 @@ public class Analysis {
 	 */
 	public Column getColumn(Node node) {
 		return columns.get(node);
+	}
+
+	/**
+	 * Returns the expression written in the SQL of a database.
+	 *
+	 * @param db The database engine.
+	 * @return The SQL.
+	 */
+	public String toSQL(DBEngine db) {
+		return new Writer(db, this).write();
 	}
 
 	/**

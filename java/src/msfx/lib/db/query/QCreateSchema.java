@@ -87,4 +87,14 @@ public class QCreateSchema extends QBase {
 		sql.append(getDBEngine().quote(schema));
 		return sql.toString();
 	}
+
+	/**
+	 * Returns the SQL statement, as {@link #execute()} runs it.
+	 *
+	 * @return The SQL statement.
+	 */
+	@Override
+	public String toString() {
+		return toSQL();
+	}
 }

@@ -406,6 +406,15 @@ public class DBEngineSQLServer extends DBEngine {
 		return getCallSQL("CONCAT", operands);
 	}
 
+	/**
+	 * 4096, the columns per SELECT statement of the maximum capacity
+	 * specifications of SQL Server, the same in every version since 2005.
+	 */
+	@Override
+	public int getMaxSelectColumns() {
+		return 4096;
+	}
+
 	@Override
 	public String getColumnType(Column col) {
 		Types type = col.getType();

@@ -72,4 +72,14 @@ public class QDropTable extends QBase {
 		sql.append(getQualifiedName(table));
 		return sql.toString();
 	}
+
+	/**
+	 * Returns the SQL statement, as {@link #execute()} runs it.
+	 *
+	 * @return The SQL statement.
+	 */
+	@Override
+	public String toString() {
+		return toSQL();
+	}
 }

@@ -27,7 +27,7 @@ public enum Clause {
 
 	/** A column of the select list: a value, with one aggregate at most, as the whole expression. */
 	SELECT,
-	/** The link of a join: a condition without aggregates. */
+	/** The link of a join: a condition without aggregates nor placeholders. */
 	ON,
 	/** A condition of the WHERE clause, without aggregates. */
 	WHERE,

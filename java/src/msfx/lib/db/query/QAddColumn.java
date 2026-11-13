@@ -96,4 +96,14 @@ public class QAddColumn extends QBase {
 		}
 		return sql.toString();
 	}
+
+	/**
+	 * Returns the SQL statement, as {@link #execute()} runs it.
+	 *
+	 * @return The SQL statement.
+	 */
+	@Override
+	public String toString() {
+		return toSQL();
+	}
 }

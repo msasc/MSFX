@@ -47,4 +47,14 @@ public class QWhere extends QBase {
 	QFrom getFrom() {
 		return from;
 	}
+
+	/**
+	 * Returns the SQL, not generated yet.
+	 *
+	 * @return The SQL.
+	 */
+	@Override
+	public String toString() {
+		throw new UnsupportedOperationException("Not implemented yet");
+	}
 }

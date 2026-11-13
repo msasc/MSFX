@@ -39,7 +39,8 @@ import msfx.lib.md.Value;
  * <li>Aggregates can not be nested.</li>
  * <li>IN accepts 1000 values at most, the limit of Oracle.</li>
  * <li>CASE can be nested 10 levels at most, the limit of SQL Server.</li>
- * <li>Each placeholder must have a value, and each value a placeholder.</li>
+ * <li>Each placeholder must have a value, and each value a placeholder. ON
+ * accepts no placeholders.</li>
  * </ul>
  *
  * @author Miquel Sas
@@ -186,6 +187,9 @@ public class Validator {
 			case STAR:
 				yield 0;
 			case PARAMETER:
+				if (clause == Clause.ON) {
+					throw error("Placeholders are not accepted in ON", node);
+				}
 				if (node.getIndex() >= values.size()) {
 					throw error("No value for this placeholder", node);
 				}

@@ -81,4 +81,14 @@ public class QDropPrimaryKey extends QBase {
 		sql.append(db.quote(table.getPrimaryKey().getName()));
 		return sql.toString();
 	}
+
+	/**
+	 * Returns the SQL statement, as {@link #execute()} runs it.
+	 *
+	 * @return The SQL statement.
+	 */
+	@Override
+	public String toString() {
+		return toSQL();
+	}
 }

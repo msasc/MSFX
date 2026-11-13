@@ -75,4 +75,14 @@ public class QFrom extends QBase {
 		}
 		return sql.toString();
 	}
+
+	/**
+	 * Returns the clause, as {@link #toSQL()} writes it.
+	 *
+	 * @return The FROM clause.
+	 */
+	@Override
+	public String toString() {
+		return toSQL();
+	}
 }

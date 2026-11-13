@@ -365,6 +365,17 @@ public class DBEngineOracle extends DBEngine {
 		return concat.toString();
 	}
 
+	/**
+	 * 1000, the columns per table or view of the logical limits of Oracle, that
+	 * also apply to the result of a query (ORA-01792). Since 23ai the parameter
+	 * MAX_COLUMNS = EXTENDED raises it to 4096, but the default is 1000 and older
+	 * clients can not read more.
+	 */
+	@Override
+	public int getMaxSelectColumns() {
+		return 1000;
+	}
+
 	@Override
 	public String getColumnType(Column col) {
 		Types type = col.getType();

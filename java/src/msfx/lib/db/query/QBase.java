@@ -84,4 +84,14 @@ public abstract class QBase {
             return st.executeUpdate(sql);
         }
     }
+
+    /**
+     * Returns the SQL the query generates, as far as it is built, to see it while
+     * debugging and to run it as is in an SQL editor. Every query class and every
+     * part of a query must implement it.
+     *
+     * @return The SQL.
+     */
+    @Override
+    public abstract String toString();
 }

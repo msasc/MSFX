@@ -16,14 +16,22 @@
 
 package msfx.lib.db.query;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
+import msfx.lib.db.DBEngine;
+import msfx.lib.db.query.sa.Analysis;
+import msfx.lib.db.query.sa.Clause;
 import msfx.lib.md.Table;
 
 /**
- * Join of a table to the statement. Adds the table to the tables of the
- * statement, and has the ON conditions, that can reference the columns of all
- * the tables added so far.
+ * Join of a table to the statement, LEFT or INNER, with the ON condition that
+ * links it to the tables added before it.
+ * <p>
+ * The condition is validated when the join is created, against the tables in
+ * scope at that moment: those of the FROM clause and of the previous joins, and
+ * the joined table itself. It accepts no placeholders and no aggregates.
  * <p>
  * Created only by its statement.
  *
@@ -32,37 +40,89 @@ import msfx.lib.md.Table;
 public class QJoin extends QBase {
 
 	/**
-	 * Joined table.
+	 * Types of join. OUTER and CROSS joins are not supported.
+	 */
+	public enum Type {
+		/** LEFT JOIN: all the rows of the previous tables, with or without match. */
+		LEFT,
+		/** INNER JOIN: only the rows with a match. */
+		INNER
+	}
+
+	/**
+	 * The type of join.
+	 */
+	private final Type type;
+	/**
+	 * The joined table.
 	 */
 	private final Table table;
 	/**
-	 * Alias of the joined table, or null to use the name of the table.
+	 * The alias of the joined table.
 	 */
 	private final String alias;
 	/**
-	 * ON conditions.
+	 * The validated ON condition.
 	 */
-	private final QWhere on;
+	private final Analysis link;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param from  The FROM clause of the statement.
-	 * @param table The joined table.
-	 * @param alias The alias, or null to use the name of the table.
-	 * @throws NullPointerException If the table is null.
+	 * @param db       The database engine.
+	 * @param type     The type of join.
+	 * @param table    The joined table.
+	 * @param alias    The alias of the joined table.
+	 * @param linkExpr The ON condition.
+	 * @param scope    The tables the condition can use, by alias: those of the
+	 *                 FROM clause, of the previous joins, and the joined table.
+	 * @throws NullPointerException                      If any argument is null.
+	 * @throws IllegalArgumentException                  If the alias is blank.
+	 * @throws msfx.lib.db.query.sa.SyntaxException If the condition is wrong.
 	 */
-	QJoin(QFrom from, Table table, String alias) {
-		super(from.getDBEngine());
+	QJoin(DBEngine db, Type type, Table table, String alias, String linkExpr, Map<String, Table> scope) {
+		super(db);
+		this.type = Objects.requireNonNull(type, "Type can not be null");
 		this.table = Objects.requireNonNull(table, "Table can not be null");
-		this.alias = alias;
-		this.on = new QWhere(from);
+		this.alias = Objects.requireNonNull(alias, "Alias can not be null");
+		if (alias.isBlank()) {
+			throw new IllegalArgumentException("Alias can not be blank");
+		}
+		Objects.requireNonNull(linkExpr, "Link expression can not be null");
+		this.link = Analysis.analyze(linkExpr, Clause.ON, scope, List.of(), List.of());
 	}
 
 	/**
-	 * @return The ON conditions.
+	 * Returns the join: LEFT JOIN table alias ON condition, or INNER JOIN. The
+	 * alias is written without AS, which Oracle does not accept for tables.
+	 *
+	 * @return The join.
 	 */
-	public QWhere getOn() {
-		return on;
+	String toSQL() {
+		DBEngine db = getDBEngine();
+		String join = switch (type) {
+			case LEFT:
+				yield "LEFT JOIN ";
+			case INNER:
+				yield "INNER JOIN ";
+		};
+		StringBuilder sql = new StringBuilder();
+		sql.append(join);
+		sql.append(getQualifiedName(table));
+		sql.append(" ");
+		sql.append(db.quote(alias));
+		sql.append(" ON ");
+		sql.append(link.toSQL(db));
+		return sql.toString();
+	}
+
+	/**
+	 * Returns the join, as {@link #toSQL()} writes it.
+	 *
+	 * @return The join.
+	 */
+	@Override
+	public String toString() {
+		return toSQL();
 	}
 }

@@ -54,7 +54,9 @@ desktop and task concurrency packages) must be as well defined as possible.
   constructor, with no getters, except the parts a caller needs to build the
   query (like `QSelect.getWhere()`). `toSQL()` is private. Parts (`QFrom`,
   `QWhere`, `QJoin`, `QGroupBy`, `QOrderBy`) are created only by their
-  statement and share its `QFrom`.
+  statement and share its `QFrom`. Every query class and part has a public
+  `toString()` (abstract in `QBase`) with the SQL built so far, for debugging
+  and to paste into an SQL editor; it is the last method of the class.
 - **DDL** writes only the logical definition: no tablespaces, `ONLINE`,
   `FILLFACTOR` or other physical options, and no ASC/DESC in indexes.
   SQL Server defaults are named constraints `DF_table_column`.

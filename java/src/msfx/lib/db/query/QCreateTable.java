@@ -77,4 +77,27 @@ public class QCreateTable extends QBase {
 			new QCreateIndex(db, table, index).execute();
 		}
 	}
+
+	/**
+	 * Returns the SQL statements of the three steps, in the order
+	 * {@link #execute()} runs them, each one ended by a semicolon and a new line.
+	 *
+	 * @return The SQL statements.
+	 */
+	@Override
+	public String toString() {
+		DBEngine db = getDBEngine();
+		StringBuilder sql = new StringBuilder();
+		sql.append(new QCreateTableColumns(db, table));
+		sql.append(";\n");
+		if (table.getPrimaryKey() != null) {
+			sql.append(new QCreatePrimaryKey(db, table));
+			sql.append(";\n");
+		}
+		for (Index index : table.getIndexes()) {
+			sql.append(new QCreateIndex(db, table, index));
+			sql.append(";\n");
+		}
+		return sql.toString();
+	}
 }

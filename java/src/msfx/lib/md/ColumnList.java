@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.IntStream;
@@ -83,6 +84,10 @@ public class ColumnList implements Iterable<Column> {
 	 * Indexes by alias. Rebuilt.
 	 */
 	private final Map<String, Integer> indexesByAlias = new HashMap<>();
+	/**
+	 * Aliases by their upper case key, to find them ignoring case. Rebuilt.
+	 */
+	private final Map<String, String> aliasesByKey = new HashMap<>();
 	/**
 	 * Columns by index. Rebuilt.
 	 */
@@ -148,21 +153,19 @@ public class ColumnList implements Iterable<Column> {
 		if (alias.isBlank()) {
 			throw new IllegalArgumentException("Alias can not be blank");
 		}
-		for (String existing : columnsByAlias.keySet()) {
+		String existing = aliasesByKey.get(toKey(alias));
+		if (existing != null) {
+			StringBuilder msg = new StringBuilder();
 			if (existing.equals(alias)) {
-				StringBuilder msg = new StringBuilder();
 				msg.append("Alias already exists: ");
 				msg.append(alias);
-				throw new IllegalArgumentException(msg.toString());
-			}
-			if (existing.equalsIgnoreCase(alias)) {
-				StringBuilder msg = new StringBuilder();
+			} else {
 				msg.append("Alias ");
 				msg.append(alias);
 				msg.append(" differs only in case from existing alias ");
 				msg.append(existing);
-				throw new IllegalArgumentException(msg.toString());
 			}
+			throw new IllegalArgumentException(msg.toString());
 		}
 		if (interceptor != null) {
 			interceptor.accept(alias, column);
@@ -188,12 +191,18 @@ public class ColumnList implements Iterable<Column> {
 	 * @return The column, or null if not found.
 	 */
 	public Column getIgnoreCase(String alias) {
-		for (Map.Entry<String, Column> entry : columnsByAlias.entrySet()) {
-			if (entry.getKey().equalsIgnoreCase(alias)) {
-				return entry.getValue();
-			}
-		}
-		return null;
+		String existing = aliasesByKey.get(toKey(alias));
+		return existing == null ? null : columnsByAlias.get(existing);
+	}
+
+	/**
+	 * Returns the key of an alias in the map of aliases ignoring case.
+	 *
+	 * @param alias The alias.
+	 * @return The alias in upper case.
+	 */
+	private static String toKey(String alias) {
+		return alias.toUpperCase(Locale.ROOT);
 	}
 
 	/**
@@ -276,11 +285,13 @@ public class ColumnList implements Iterable<Column> {
 		columnsByIndex = new Column[size];
 		aliasesByIndex = new String[size];
 		indexesByAlias.clear();
+		aliasesByKey.clear();
 		int index = 0;
 		for (Map.Entry<String, Column> entry : columnsByAlias.entrySet()) {
 			columnsByIndex[index] = entry.getValue();
 			aliasesByIndex[index] = entry.getKey();
 			indexesByAlias.put(entry.getKey(), index);
+			aliasesByKey.put(toKey(entry.getKey()), entry.getKey());
 			index++;
 		}
 		columnList = Collections.unmodifiableList(Arrays.asList(columnsByIndex));

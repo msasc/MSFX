@@ -497,6 +497,14 @@ public abstract class DBEngine {
 	public abstract String getConcatSQL(List<String> operands);
 
 	/**
+	 * Returns the maximum number of columns of a SELECT in this database, checked
+	 * when columns are added to a select.
+	 *
+	 * @return The maximum number of columns.
+	 */
+	public abstract int getMaxSelectColumns();
+
+	/**
 	 * Returns a function call in the form of this database, with the behavior
 	 * described in {@link Function}.
 	 * <p>

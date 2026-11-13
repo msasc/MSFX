@@ -100,4 +100,14 @@ public class QCreateTableColumns extends QBase {
 		sql.append(")");
 		return sql.toString();
 	}
+
+	/**
+	 * Returns the SQL statement, as {@link #execute()} runs it.
+	 *
+	 * @return The SQL statement.
+	 */
+	@Override
+	public String toString() {
+		return toSQL();
+	}
 }
