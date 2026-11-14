@@ -84,6 +84,8 @@ desktop and task concurrency packages) must be as well defined as possible.
   short compositions and exception messages. Never `+` or `+=`.
 - Initials keep their case in identifiers: `toSQL`, `DBEngine`, `getDBEngine`,
   `getURL`, `JSONObject`. Naming conventions give way to readability.
+- An external name used in an identifier (a table, a column) keeps its own
+  form, separated by an underscore instead of camel case: `table_WC_VADJ_ART`.
 - Switches use the old colon labels (`case X:`), never arrows (`->`), for
   readability and step-by-step debugging. Over an enum, write a switch
   expression with `yield` and no `default`, so the compiler checks that every
