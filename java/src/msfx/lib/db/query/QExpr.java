@@ -23,6 +23,7 @@ import java.util.Objects;
 import msfx.lib.db.DBEngine;
 import msfx.lib.db.query.sa.Analysis;
 import msfx.lib.db.query.sa.Clause;
+import msfx.lib.db.query.sa.Node;
 import msfx.lib.md.Domain;
 import msfx.lib.md.Table;
 
@@ -74,6 +75,78 @@ public class QExpr {
 		}
 		this.domain = domain;
 		this.analysis = Analysis.analyze(expr, Clause.SELECT, tables, List.of(), List.of());
+	}
+
+	/**
+	 * Returns the validated expression, used by the select to validate HAVING
+	 * against its select list.
+	 *
+	 * @return The analysis.
+	 */
+	Analysis getAnalysis() {
+		return analysis;
+	}
+
+	/**
+	 * Checks whether the expression is an aggregate.
+	 *
+	 * @return True if the expression is an aggregate.
+	 */
+	boolean isAggregate() {
+		return analysis.getAggregate() != null;
+	}
+
+	/**
+	 * Checks whether the expression goes to the GROUP BY clause: it is not an
+	 * aggregate, and uses at least one column of the given tables.
+	 *
+	 * @param tables The tables of the select, by alias, without the outer ones.
+	 * @return True if the expression is grouped.
+	 */
+	boolean isGrouped(Map<String, Table> tables) {
+		if (isAggregate()) {
+			return false;
+		}
+		return usesTables(analysis.getRoot(), tables);
+	}
+
+	/**
+	 * Checks whether a node or its children use a column of the given tables.
+	 *
+	 * @param node   The node.
+	 * @param tables The tables, by alias.
+	 * @return True if a column of the tables is used.
+	 */
+	private boolean usesTables(Node node, Map<String, Table> tables) {
+		if (node.getKind() == Node.Kind.COLUMN) {
+			return tables.containsKey(analysis.getAlias(node));
+		}
+		for (Node child : node.getChildren()) {
+			if (usesTables(child, tables)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Returns the expression, without the alias.
+	 *
+	 * @param db The database engine.
+	 * @return The expression.
+	 */
+	String toExprSQL(DBEngine db) {
+		return analysis.toSQL(db);
+	}
+
+	/**
+	 * Returns the alias, quoted.
+	 *
+	 * @param db The database engine.
+	 * @return The alias.
+	 */
+	String toAliasSQL(DBEngine db) {
+		return db.quote(alias);
 	}
 
 	/**

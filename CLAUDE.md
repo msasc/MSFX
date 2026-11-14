@@ -66,6 +66,14 @@ desktop and task concurrency packages) must be as well defined as possible.
 - **Nulls.** Numbers and booleans are never null. Oracle stores `''` as NULL,
   so Oracle STRING columns get no NOT NULL and no `DEFAULT ''`. Null checks in
   SQL go through `DBEngine.isNull` and `isNotNull`.
+- **Exceptions.** Each layer throws the checked exception of its context
+  (`SQLException` in db) and translates other checked exceptions into it,
+  keeping them as the cause. Never catch `Throwable` or `Error`. Don't wrap a
+  `RuntimeException` (it is a bug, let it pass) nor an exception already of
+  the context type. When wrapping an `InterruptedException`, set the
+  interrupted flag again with `Thread.currentThread().interrupt()`. Callbacks
+  written by the caller may throw `Exception`; the method that calls them
+  translates around the call only.
 
 ## Code style
 

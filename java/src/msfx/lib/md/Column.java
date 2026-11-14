@@ -103,6 +103,19 @@ public class Column implements Copyable<Column> {
     }
 
     /**
+     * Creates a column from a domain with another name, copying the rest as
+     * {@link #Column(Domain)} does.
+     *
+     * @param name   The name of the column.
+     * @param domain The domain.
+     * @throws NullPointerException If the domain is null.
+     */
+    public Column(String name, Domain domain) {
+        this(domain);
+        props.put("name", name);
+    }
+
+    /**
      * @return The name of the column.
      */
     public String getName() {

@@ -47,7 +47,7 @@ public class QUpdate extends QBase {
 	public QUpdate(DBEngine db, Table table) {
 		super(db);
 		from = new QFrom(db, table, null);
-		where = new QWhere(from);
+		where = new QWhere(db);
 	}
 
 	/**
