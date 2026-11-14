@@ -62,11 +62,8 @@ public class Column implements Copyable<Column> {
      *                 applicable.
      */
     public Column(String name, Types type, int length, int decimals) {
-        Objects.requireNonNull(type, "Type can not be null");
-        props.putObject("type", type);
+        props.putObject("data-type", new DataType(type, length, decimals));
         props.put("name", name);
-        props.put("length", length);
-        props.put("decimals", decimals);
     }
 
     /**
@@ -80,10 +77,8 @@ public class Column implements Copyable<Column> {
      */
     public Column(Domain domain) {
         Objects.requireNonNull(domain, "Domain can not be null");
-        props.putObject("type", domain.getType());
+        props.putObject("data-type", domain.getDataType());
         props.put("name", domain.getName());
-        props.put("length", domain.getLength());
-        props.put("decimals", domain.getDecimals());
         if (domain.getHeader() != null) {
             props.put("header", domain.getHeader());
         }
@@ -123,24 +118,69 @@ public class Column implements Copyable<Column> {
     }
 
     /**
+     * @return The data type of the column: type, length and decimals.
+     */
+    public DataType getDataType() {
+        return props.getObject("data-type", DataType.class);
+    }
+
+    /**
+     * Returns a new domain with the definition of the column, to define other
+     * columns like it, for instance the columns of a select. It has the name and
+     * the data type of the column, and the header, label, description, possible
+     * values and default value explicitly set in the column, without the
+     * fallbacks of the getters. The table, the nullable flag and the user
+     * properties are not part of a domain.
+     * <p>
+     * A new domain is created on each call, reflecting the current definition
+     * of the column; the data type is shared, since it is immutable.
+     *
+     * @return The domain.
+     */
+    public Domain getDomain() {
+        Domain domain = new Domain(getName(), getDataType());
+        String header = props.getString("header", null);
+        if (header != null) {
+            domain.setHeader(header);
+        }
+        String label = props.getString("label", null);
+        if (label != null) {
+            domain.setLabel(label);
+        }
+        String description = props.getString("description", null);
+        if (description != null) {
+            domain.setDescription(description);
+        }
+        /* Possible values first, so that the default value is one of them. */
+        for (Map.Entry<Value, String> entry : getPossibleValues().entrySet()) {
+            domain.setPossibleValue(entry.getKey(), entry.getValue());
+        }
+        Value defaultValue = getExplicitDefaultValue();
+        if (defaultValue != null) {
+            domain.setDefaultValue(defaultValue);
+        }
+        return domain;
+    }
+
+    /**
      * @return The type of the column.
      */
     public Types getType() {
-        return props.getObject("type", Types.class);
+        return getDataType().type();
     }
 
     /**
      * @return The length of the column, -1 if not applicable.
      */
     public int getLength() {
-        return props.getInteger("length");
+        return getDataType().length();
     }
 
     /**
      * @return The number of decimal places for the column, -1 if not applicable.
      */
     public int getDecimals() {
-        return props.getInteger("decimals");
+        return getDataType().decimals();
     }
 
     /**

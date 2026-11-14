@@ -340,11 +340,12 @@ public class DBEngineSQLServer extends DBEngine {
 	}
 
 	/**
-	 * Booleans are stored as '1' and '0', as the driver converts them.
+	 * Booleans are stored as 'Y' and 'N', for readability. When read, 1/0 and
+	 * T/F are also accepted.
 	 */
 	@Override
 	public String getLiteralSQL(boolean bool) {
-		return bool ? "'1'" : "'0'";
+		return bool ? "'Y'" : "'N'";
 	}
 
 	/**

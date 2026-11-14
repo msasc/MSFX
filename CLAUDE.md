@@ -90,6 +90,14 @@ desktop and task concurrency packages) must be as well defined as possible.
   readability and step-by-step debugging. Over an enum, write a switch
   expression with `yield` and no `default`, so the compiler checks that every
   constant is handled; assign it to a local before returning it.
+- Code is written for step-by-step debugging: each call whose result matters
+  goes to a local variable before it is used, instead of being nested in
+  another expression (`qprod = getQuantity(); mprod = getAmount();
+  pprod = Numbers.zdiv(mprod, qprod);`, not one line). Lambdas are assigned to
+  a local before they are passed, not written inline in the call.
+- A general function needed inside a class, likely to be needed again, goes to
+  its utility class in `util` (numbers in `Numbers`, strings in `Strings`, and
+  so on), not as a private method. Utility classes grow only as needed.
 - Methods not yet implemented throw
   `new UnsupportedOperationException("Not implemented yet")`.
 

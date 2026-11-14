@@ -200,8 +200,8 @@ public class TestQSelectColumns {
 		System.out.println("== Select list");
 		QSelect select = fromSales(SQLSERVER);
 		select.leftJoin(articles, "A", "S.CARTICLE = A.CARTICLE");
-		select.addColumn("S.CCOMPANY", "CCOMPANY");
-		select.addColumn("a.darticle", "Description");
+		select.addColumn("S.CCOMPANY", "CCOMPANY", new Domain("CCOMPANY", Types.STRING, 10, -1));
+		select.addColumn("a.darticle", "Description", new Domain("DARTICLE", Types.STRING, 200, -1));
 		select.addColumn("S.CCOMPANY || '-' || S.CARTICLE", "CODE", new Domain("CODE", Types.STRING, 51, -1));
 		sql("Columns, SQL Server", select, lines(
 				"SELECT [S].[CCOMPANY] AS [CCOMPANY], [A].[DARTICLE] AS [Description], CONCAT([S].[CCOMPANY], N'-', [S].[CARTICLE]) AS [CODE]",

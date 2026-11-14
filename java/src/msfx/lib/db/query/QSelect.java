@@ -35,9 +35,14 @@ import msfx.lib.db.DBResultSet;
 import msfx.lib.db.DBStatement;
 import msfx.lib.db.query.sa.Analysis;
 import msfx.lib.db.query.sa.Clause;
+import msfx.lib.md.Column;
+import msfx.lib.md.ColumnList;
+import msfx.lib.md.DataType;
 import msfx.lib.md.Domain;
+import msfx.lib.md.Record;
 import msfx.lib.md.Table;
 import msfx.lib.md.Value;
+import msfx.lib.util.Numbers;
 
 /**
  * SELECT statement.
@@ -48,6 +53,10 @@ import msfx.lib.md.Value;
  * A select created for an EXISTS condition of an outer select also sees the
  * tables of the outer selects. Aliases are unique in the whole tree of
  * selects, so that an inner alias never hides an outer one.
+ * <p>
+ * Instead of a master table, the FROM clause can wrap the UNION or UNION ALL
+ * of other selects, with an alias, as a table whose columns are their column
+ * aliases.
  *
  * @author Miquel Sas
  */
@@ -93,8 +102,8 @@ public class QSelect extends QBase {
 	 */
 	private boolean attached = false;
 	/**
-	 * FROM clause, with the master table and its alias, or null while it is not
-	 * set.
+	 * FROM clause, with the master table and its alias, or the wrapped selects
+	 * and their alias, or null while it is not set.
 	 */
 	private QFrom from;
 	/**
@@ -108,6 +117,18 @@ public class QSelect extends QBase {
 	 * Code generated selects can have hundreds of columns.
 	 */
 	private final Map<String, QExpr> columns = new LinkedHashMap<>();
+	/**
+	 * Columns of the records read, one per column of the select list, named
+	 * after its alias, with the definition of its domain, in the order they were
+	 * added. Empty when the columns have no domain: all the columns have a
+	 * domain or none has.
+	 */
+	private final ColumnList recordColumns = new ColumnList();
+	/**
+	 * Data types of the record columns, by index, so that each row read does
+	 * not look them up in the column properties.
+	 */
+	private final List<DataType> recordDataTypes = new ArrayList<>();
 
 	/**
 	 * WHERE clause, written only when it has conditions.
@@ -171,6 +192,53 @@ public class QSelect extends QBase {
 	}
 
 	/**
+	 * Sets the FROM clause with the UNION of selects, wrapped within parentheses
+	 * with an alias, as an alternative to {@link #from(Table, String)}. The
+	 * wrapped source is registered as a table named after the alias, with the
+	 * columns of the first select named after their aliases, so that joins,
+	 * columns, conditions and the other clauses use it as any table.
+	 *
+	 * @param alias   The alias of the wrapped selects.
+	 * @param selects The wrapped selects: complete, without ORDER BY, and with
+	 *                the same column aliases in the same order.
+	 * @throws NullPointerException     If the alias, the selects or one of them
+	 *                                  is null.
+	 * @throws IllegalArgumentException If the alias is blank or already used,
+	 *                                  there are no selects, or a select has
+	 *                                  another engine, an ORDER BY clause, or
+	 *                                  other column aliases than the first one.
+	 * @throws IllegalStateException    If the FROM clause is already set, or a
+	 *                                  select can not be executed.
+	 */
+	public void wrapUnion(String alias, QSelect... selects) {
+		wrap(alias, selects, false);
+	}
+
+	/**
+	 * Sets the FROM clause with the UNION ALL of selects, wrapped within
+	 * parentheses with an alias, as an alternative to
+	 * {@link #from(Table, String)}. The wrapped source is registered as a table
+	 * named after the alias, with the columns of the first select named after
+	 * their aliases, so that joins, columns, conditions and the other clauses
+	 * use it as any table.
+	 *
+	 * @param alias   The alias of the wrapped selects.
+	 * @param selects The wrapped selects: complete, without ORDER BY, and with
+	 *                the same column aliases in the same order.
+	 * @throws NullPointerException     If the alias, the selects or one of them
+	 *                                  is null.
+	 * @throws IllegalArgumentException If the alias is blank or already used,
+	 *                                  there are no selects, or a select has
+	 *                                  another engine, an ORDER BY clause, or
+	 *                                  other column aliases than the first one.
+	 * @throws IllegalStateException    If the FROM clause is already set, or a
+	 *                                  select can not be executed.
+	 */
+	public void wrapUnionAll(String alias, QSelect... selects) {
+		wrap(alias, selects, true);
+	}
+
+	/**
 	 * Adds a LEFT JOIN: all the rows of the previous tables, with or without a
 	 * matching row in the joined table.
 	 *
@@ -214,7 +282,8 @@ public class QSelect extends QBase {
 	 * @param alias The alias of the column in the result, unique ignoring case.
 	 * @throws NullPointerException                 If an argument is null.
 	 * @throws IllegalArgumentException             If the alias is blank or
-	 *                                              already used.
+	 *                                              already used, or the previous
+	 *                                              columns have a domain.
 	 * @throws IllegalStateException                If the FROM clause is not set,
 	 *                                              or the select has already the
 	 *                                              maximum number of columns of
@@ -232,11 +301,15 @@ public class QSelect extends QBase {
 	 *
 	 * @param expr   The expression.
 	 * @param alias  The alias of the column in the result, unique ignoring case.
-	 * @param domain The domain, or null.
+	 * @param domain The domain, or null. All the columns have a domain or none
+	 *               has.
 	 * @throws NullPointerException                 If the expression or the alias
 	 *                                              is null.
 	 * @throws IllegalArgumentException             If the alias is blank or
-	 *                                              already used.
+	 *                                              already used, or the column
+	 *                                              has a domain and the previous
+	 *                                              ones have none, or the other
+	 *                                              way round.
 	 * @throws IllegalStateException                If the FROM clause is not set,
 	 *                                              or the select has already the
 	 *                                              maximum number of columns of
@@ -267,7 +340,20 @@ public class QSelect extends QBase {
 			msg.append(db.getAdapter());
 			throw new IllegalStateException(msg.toString());
 		}
+		/* Validate mixing call with and without domain */
+		boolean canAdd = (domain != null && columns.size() == recordColumns.size());
+		canAdd |= (domain == null && recordColumns.isEmpty());
+		if (!canAdd) {
+			StringBuilder msg = new StringBuilder();
+			msg.append("You are mixing call with and without a Domain");
+			throw new IllegalArgumentException(msg.toString());
+		}
+		/* Do add it. */
 		columns.put(key, new QExpr(expr, alias, domain, scope()));
+		if (domain != null) {
+			recordColumns.add(new Column(alias, domain));
+			recordDataTypes.add(domain.getDataType());
+		}
 	}
 
 	/**
@@ -743,6 +829,109 @@ public class QSelect extends QBase {
 	}
 
 	/**
+	 * Returns the columns of the records read: one column per column of the
+	 * select, in the order of the select, named after its alias, with the
+	 * definition of its domain. The columns are created when added to the
+	 * select and belong to no table.
+	 * <p>
+	 * The list returned is the one of the select, shared by the records it
+	 * reads. Changes made to it or its columns show in the records read
+	 * afterwards; they are not meant to be changed.
+	 *
+	 * @return The column list.
+	 * @throws IllegalStateException If the select has no columns, or its
+	 *                               columns have no domain.
+	 */
+	public ColumnList getColumnList() {
+		if (columns.isEmpty()) {
+			throw new IllegalStateException("The select has no columns");
+		}
+		if (recordColumns.isEmpty()) {
+			throw new IllegalStateException("The columns of the select have no domain");
+		}
+		return recordColumns;
+	}
+
+	/**
+	 * Returns the values of the current row, one per column of
+	 * {@link #getColumnList()} and in its order, to create a record. Each value
+	 * is read with the getter of the type of its column, the driver converting
+	 * the type of the database, and is not modified:
+	 * <ul>
+	 * <li>DECIMAL values get the decimals of the column, rounded half up.</li>
+	 * <li>Null numbers and booleans are zero and false, null strings are
+	 * empty.</li>
+	 * <li>Booleans are read from 1/0, Y/N or T/F, and objects parsed from their
+	 * JSON text.</li>
+	 * </ul>
+	 * Meant to be called for every row read, it checks only that the columns
+	 * have a domain. Each column is read once, in order.
+	 *
+	 * @param rs The result set of this select, positioned on the row.
+	 * @return The values, a new array on each call.
+	 * @throws IllegalStateException If the columns of the select have no
+	 *                               domain.
+	 * @throws SQLException          If a database access error occurs, or an
+	 *                               object is not valid JSON.
+	 */
+	public Value[] getValues(DBResultSet rs) throws SQLException {
+		if (recordColumns.isEmpty()) {
+			throw new IllegalStateException("The columns of the select have no domain");
+		}
+		int size = recordDataTypes.size();
+		Value[] values = new Value[size];
+		for (int i = 0; i < size; i++) {
+			int index = i + 1;
+			DataType dataType = recordDataTypes.get(i);
+			Value value = switch (dataType.type()) {
+				case BOOLEAN:
+					yield new Value(rs.getBoolean(index));
+				case DECIMAL:
+					yield new Value(Numbers.toScale(rs.getDecimal(index), dataType.decimals()));
+				case DOUBLE:
+					yield new Value(rs.getDouble(index));
+				case INTEGER:
+					yield new Value(rs.getInteger(index));
+				case LONG:
+					yield new Value(rs.getLong(index));
+				case DATE:
+					yield new Value(rs.getDate(index));
+				case TIME:
+					yield new Value(rs.getTime(index));
+				case DATETIME:
+					yield new Value(rs.getDateTime(index));
+				case STRING: {
+					String string = rs.getString(index);
+					yield new Value(string != null ? string : "");
+				}
+				case BINARY:
+					yield new Value(rs.getBinary(index));
+				case OBJECT:
+					yield new Value(rs.getObject(index));
+			};
+			values[i] = value;
+		}
+		return values;
+	}
+
+	/**
+	 * Returns the record of the current row, with the column list of the
+	 * select, shared by all the records it reads, and the values of the row.
+	 *
+	 * @param rs The result set of this select, positioned on the row.
+	 * @return The record.
+	 * @throws IllegalStateException If the select has no columns, or its
+	 *                               columns have no domain.
+	 * @throws SQLException          If a database access error occurs, or an
+	 *                               object is not valid JSON.
+	 * @see #getColumnList()
+	 * @see #getValues(DBResultSet)
+	 */
+	public Record getRecord(DBResultSet rs) throws SQLException {
+		return new Record(getColumnList(), getValues(rs));
+	}
+
+	/**
 	 * Executes the select on its own pooled connection and passes each row to
 	 * the callback, until there are no more rows or the callback returns false.
 	 * The result set, the statement and the connection are closed in any case.
@@ -772,6 +961,102 @@ public class QSelect extends QBase {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Executes the select on its own pooled connection and returns all the rows
+	 * read as records, sharing the column list of the select. The result set,
+	 * the statement and the connection are closed in any case.
+	 * <p>
+	 * All the records are kept in memory: large reads go through
+	 * {@link #readCallback(Callback)}, processing each record as it is read.
+	 *
+	 * @return The records, in the order read, empty if there are no rows.
+	 * @throws IllegalStateException If the select can not be executed: no FROM
+	 *                               clause, no columns, an EXISTS select, or
+	 *                               aggregates and other expressions without
+	 *                               groupBy(); or its columns have no domain.
+	 * @throws SQLException          If a database access error occurs, or an
+	 *                               object is not valid JSON.
+	 * @see #getRecord(DBResultSet)
+	 */
+	public List<Record> readList() throws SQLException {
+		/* Fails before executing, also when there would be no rows. */
+		getColumnList();
+		List<Record> recs = new ArrayList<>();
+		Callback cb = rs -> {
+			recs.add(getRecord(rs));
+			return true;
+		};
+		readCallback(cb);
+		return recs;
+	}
+
+	/**
+	 * Sets the FROM clause with the union of selects, and registers the table
+	 * that stands for them. Column types are not validated: the database checks
+	 * them.
+	 *
+	 * @param alias   The alias.
+	 * @param selects The wrapped selects.
+	 * @param all     True for UNION ALL, false for UNION.
+	 */
+	private void wrap(String alias, QSelect[] selects, boolean all) {
+		if (from != null) {
+			throw new IllegalStateException("The FROM clause is already set");
+		}
+		Objects.requireNonNull(alias, "Alias can not be null");
+		Objects.requireNonNull(selects, "Selects can not be null");
+		if (selects.length == 0) {
+			throw new IllegalArgumentException("A union requires at least one select");
+		}
+		List<String> aliases = null;
+		for (int i = 0; i < selects.length; i++) {
+			QSelect select = Objects.requireNonNull(selects[i], "Select can not be null");
+			if (select.getDBEngine() != getDBEngine()) {
+				throw new IllegalArgumentException("A wrapped select has another database engine");
+			}
+			if (select.orderBy != null) {
+				throw new IllegalArgumentException("A wrapped select can not have an ORDER BY clause");
+			}
+			select.checkExecutable();
+			List<String> selectAliases = new ArrayList<>(select.columns.keySet());
+			if (i == 0) {
+				aliases = selectAliases;
+				continue;
+			}
+			if (selectAliases.size() != aliases.size()) {
+				StringBuilder msg = new StringBuilder();
+				msg.append("Wrapped select ");
+				msg.append(i + 1);
+				msg.append(" has ");
+				msg.append(selectAliases.size());
+				msg.append(" columns, the first one has ");
+				msg.append(aliases.size());
+				throw new IllegalArgumentException(msg.toString());
+			}
+			for (int j = 0; j < aliases.size(); j++) {
+				if (!selectAliases.get(j).equals(aliases.get(j))) {
+					StringBuilder msg = new StringBuilder();
+					msg.append("Column ");
+					msg.append(j + 1);
+					msg.append(" of wrapped select ");
+					msg.append(i + 1);
+					msg.append(" is ");
+					msg.append(selectAliases.get(j));
+					msg.append(", the first select has ");
+					msg.append(aliases.get(j));
+					throw new IllegalArgumentException(msg.toString());
+				}
+			}
+		}
+		Table table = new Table(alias);
+		for (QExpr column : selects[0].columns.values()) {
+			table.columns().add(column.createColumn());
+		}
+		checkTable(table, alias);
+		from = new QFrom(getDBEngine(), Arrays.asList(selects), all, alias);
+		tables.put(alias, table);
 	}
 
 	/**
@@ -979,7 +1264,8 @@ public class QSelect extends QBase {
 			grouped |= column.isGrouped(tables);
 		}
 		if (aggregates && grouped) {
-			throw new IllegalStateException("The select has aggregates and other expressions, groupBy() must be called");
+			throw new IllegalStateException(
+					"The select has aggregates and other expressions, groupBy() must be called");
 		}
 	}
 
@@ -1057,7 +1343,8 @@ public class QSelect extends QBase {
 	/**
 	 * Returns the statement as far as it is built, one clause per line: for now
 	 * the select list, the FROM clause, the joins, the WHERE clause, the GROUP BY
-	 * clause, the HAVING condition and the ORDER BY clause. The select list, the WHERE clause and the
+	 * clause, the HAVING condition and the ORDER BY clause. The select list, the
+	 * WHERE clause and the
 	 * GROUP BY clause are written only when they have columns, conditions or
 	 * expressions to group.
 	 *

@@ -6,6 +6,9 @@ java/bin/
 java/lib/jdk/
 java/lib/javafx/
 
+# CMA metadata of a client application, kept local (input of CatalogCMAGenerator)
+java/res/cma/
+
 # --- Windows -------------------------------------------------------
 Thumbs.db
 desktop.ini

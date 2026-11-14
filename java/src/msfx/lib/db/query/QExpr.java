@@ -24,8 +24,10 @@ import msfx.lib.db.DBEngine;
 import msfx.lib.db.query.sa.Analysis;
 import msfx.lib.db.query.sa.Clause;
 import msfx.lib.db.query.sa.Node;
+import msfx.lib.md.Column;
 import msfx.lib.md.Domain;
 import msfx.lib.md.Table;
+import msfx.lib.md.Types;
 
 /**
  * A column of the select list: an expression, the alias of the column in the
@@ -127,6 +129,30 @@ public class QExpr {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Creates the column of a wrapping select's table that stands for this
+	 * column of a wrapped select, named after the alias. Its type is the type of
+	 * the domain if it has one, the type of the column if the expression is a
+	 * plain column, and otherwise OBJECT, not known: types are not validated, the
+	 * database checks them.
+	 *
+	 * @return The column.
+	 */
+	Column createColumn() {
+		if (domain != null) {
+			return new Column(alias, domain);
+		}
+		Node node = analysis.getRoot();
+		while (node.getKind() == Node.Kind.GROUP) {
+			node = node.getChildren().get(0);
+		}
+		if (node.getKind() == Node.Kind.COLUMN) {
+			Column column = analysis.getColumn(node);
+			return new Column(alias, column.getType(), column.getLength(), column.getDecimals());
+		}
+		return new Column(alias, Types.OBJECT, -1, -1);
 	}
 
 	/**

@@ -25,6 +25,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+import msfx.lib.util.json.JSONObject;
+
 /**
  * A simplified JDBC result set, read forward only, with one getter per type of
  * {@link msfx.lib.md.Types}, named and typed as in {@link msfx.lib.md.Value}.
@@ -67,14 +69,18 @@ public interface DBResultSet extends AutoCloseable {
 	ResultSetMetaData getMetaData() throws SQLException;
 
 	/**
-	 * BOOLEAN.
+	 * BOOLEAN, read from the text of the column, not converted by the driver:
+	 * true if it starts with 1, Y or T in any case, as in 1/0, Y/N, T/F or a
+	 * bit; false otherwise, also for null.
 	 * @param index The column index, starting at 1.
 	 * @return The value.
 	 * @throws SQLException If an error occurs.
 	 */
 	boolean getBoolean(int index) throws SQLException;
 	/**
-	 * BOOLEAN.
+	 * BOOLEAN, read from the text of the column, not converted by the driver:
+	 * true if it starts with 1, Y or T in any case, as in 1/0, Y/N, T/F or a
+	 * bit; false otherwise, also for null.
 	 * @param alias The column alias.
 	 * @return The value.
 	 * @throws SQLException If an error occurs or the alias is not found.
@@ -238,4 +244,24 @@ public interface DBResultSet extends AutoCloseable {
 	 * @throws SQLException If an error occurs or the alias is not found.
 	 */
 	InputStream getBlob(String alias) throws SQLException;
+
+	/**
+	 * OBJECT, stored as the text of a JSON object in a CLOB, read as a stream
+	 * and parsed. As any streamed column, it can be read only once per row.
+	 * @param index The column index, starting at 1.
+	 * @return The object, or null.
+	 * @throws SQLException If an error occurs, or the text is not a JSON object,
+	 *                      with the parse error as the cause.
+	 */
+	JSONObject getObject(int index) throws SQLException;
+	/**
+	 * OBJECT, stored as the text of a JSON object in a CLOB, read as a stream
+	 * and parsed. As any streamed column, it can be read only once per row.
+	 * @param alias The column alias.
+	 * @return The object, or null.
+	 * @throws SQLException If an error occurs or the alias is not found, or the
+	 *                      text is not a JSON object, with the parse error as
+	 *                      the cause.
+	 */
+	JSONObject getObject(String alias) throws SQLException;
 }

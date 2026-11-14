@@ -16,13 +16,15 @@
 
 package msfx.lib.db.query;
 
+import java.util.List;
 import java.util.Objects;
 
 import msfx.lib.db.DBEngine;
 import msfx.lib.md.Table;
 
 /**
- * FROM clause of a statement: the master table and its alias.
+ * FROM clause of a statement: the master table and its alias, or the union of
+ * the wrapped selects and their alias.
  * <p>
  * Created only by its statement.
  *
@@ -31,17 +33,25 @@ import msfx.lib.md.Table;
 public class QFrom extends QBase {
 
 	/**
-	 * The master table.
+	 * The master table, or null if the clause wraps selects.
 	 */
 	private final Table table;
 	/**
 	 * The alias of the master table, or null if it has none, as usual in
-	 * deletes.
+	 * deletes. Always set when the clause wraps selects.
 	 */
 	private final String alias;
+	/**
+	 * The wrapped selects, or null if the clause has a master table.
+	 */
+	private final List<QSelect> selects;
+	/**
+	 * True if the wrapped selects are joined by UNION ALL, false for UNION.
+	 */
+	private final boolean all;
 
 	/**
-	 * Constructor.
+	 * Constructor of the clause with a master table.
 	 *
 	 * @param db    The database engine.
 	 * @param table The master table.
@@ -56,11 +66,33 @@ public class QFrom extends QBase {
 			throw new IllegalArgumentException("Alias can not be blank");
 		}
 		this.alias = alias;
+		this.selects = null;
+		this.all = false;
 	}
 
 	/**
-	 * Returns the clause: FROM table [alias]. The alias is written only when set,
-	 * without AS, which Oracle does not accept for tables.
+	 * Constructor of the clause that wraps the union of selects, already
+	 * validated by the wrapping select.
+	 *
+	 * @param db      The database engine.
+	 * @param selects The wrapped selects.
+	 * @param all     True for UNION ALL, false for UNION.
+	 * @param alias   The alias.
+	 * @throws NullPointerException If the engine, the selects or the alias is
+	 *                              null.
+	 */
+	QFrom(DBEngine db, List<QSelect> selects, boolean all, String alias) {
+		super(db);
+		this.table = null;
+		this.alias = Objects.requireNonNull(alias, "Alias can not be null");
+		this.selects = List.copyOf(selects);
+		this.all = all;
+	}
+
+	/**
+	 * Returns the clause: FROM table [alias], or the wrapped selects joined by
+	 * UNION or UNION ALL, indented within parentheses, and the alias. The alias
+	 * is written without AS, which Oracle does not accept for tables.
 	 *
 	 * @return The FROM clause.
 	 */
@@ -68,7 +100,22 @@ public class QFrom extends QBase {
 		DBEngine db = getDBEngine();
 		StringBuilder sql = new StringBuilder();
 		sql.append("FROM ");
-		sql.append(getQualifiedName(table));
+		if (selects == null) {
+			sql.append(getQualifiedName(table));
+		} else {
+			sql.append("(\n");
+			for (int i = 0; i < selects.size(); i++) {
+				if (i > 0) {
+					sql.append(all ? "\tUNION ALL\n" : "\tUNION\n");
+				}
+				for (String line : selects.get(i).toString().split("\n")) {
+					sql.append("\t");
+					sql.append(line);
+					sql.append("\n");
+				}
+			}
+			sql.append(")");
+		}
 		if (alias != null) {
 			sql.append(" ");
 			sql.append(db.quote(alias));

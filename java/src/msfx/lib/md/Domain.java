@@ -64,11 +64,18 @@ public class Domain implements Copyable<Domain> {
      * @throws NullPointerException If the type is null.
      */
     public Domain(String name, Types type, int length, int decimals) {
-        Objects.requireNonNull(type, "Type can not be null");
-        props.putObject("type", type);
+        this(name, new DataType(type, length, decimals));
+    }
+
+    /**
+     * Domain that shares a data type, used by {@link Column#getDomain()}.
+     *
+     * @param name     The name of the domain.
+     * @param dataType The data type.
+     */
+    Domain(String name, DataType dataType) {
+        props.putObject("data-type", dataType);
         props.put("name", name);
-        props.put("length", length);
-        props.put("decimals", decimals);
     }
 
     /**
@@ -79,24 +86,31 @@ public class Domain implements Copyable<Domain> {
     }
 
     /**
+     * @return The data type of the domain: type, length and decimals.
+     */
+    public DataType getDataType() {
+        return props.getObject("data-type", DataType.class);
+    }
+
+    /**
      * @return The type of the domain.
      */
     public Types getType() {
-        return props.getObject("type", Types.class);
+        return getDataType().type();
     }
 
     /**
      * @return The length of the domain, -1 if not applicable.
      */
     public int getLength() {
-        return props.getInteger("length");
+        return getDataType().length();
     }
 
     /**
      * @return The number of decimal places for the domain, -1 if not applicable.
      */
     public int getDecimals() {
-        return props.getInteger("decimals");
+        return getDataType().decimals();
     }
 
     /**

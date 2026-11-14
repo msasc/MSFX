@@ -17,7 +17,10 @@
 package msfx.lib.db.pool;
 
 import msfx.lib.db.DBResultSet;
+import msfx.lib.util.json.JSONObject;
+import msfx.lib.util.json.JSONParser;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -67,11 +70,36 @@ class PoolResultSet implements DBResultSet {
 
 	@Override
 	public boolean getBoolean(int index) throws SQLException {
-		return rs.getBoolean(index);
+		return toBoolean(rs.getString(index));
 	}
 	@Override
 	public boolean getBoolean(String alias) throws SQLException {
-		return rs.getBoolean(alias);
+		return toBoolean(rs.getString(alias));
+	}
+	/**
+	 * Converts the text of a boolean column, not left to the driver, since
+	 * booleans are stored as Y/N, 1/0 or T/F in one character, or as bits that
+	 * read as 1/0.
+	 *
+	 * @param value The text of the column, or null.
+	 * @return True if the text starts with 1, Y or T, in any case. False
+	 *         otherwise, also for null or an empty text.
+	 */
+	private static boolean toBoolean(String value) {
+		if (value == null || value.isEmpty()) {
+			return false;
+		}
+		boolean bool = switch (value.charAt(0)) {
+			case '1':
+			case 'Y':
+			case 'y':
+			case 'T':
+			case 't':
+				yield true;
+			default:
+				yield false;
+		};
+		return bool;
 	}
 
 	@Override
@@ -164,5 +192,45 @@ class PoolResultSet implements DBResultSet {
 	@Override
 	public InputStream getBlob(String alias) throws SQLException {
 		return rs.getBinaryStream(alias);
+	}
+
+	@Override
+	public JSONObject getObject(int index) throws SQLException {
+		StringBuilder column = new StringBuilder();
+		column.append("column ");
+		column.append(index);
+		return toObject(rs.getCharacterStream(index), column.toString());
+	}
+	@Override
+	public JSONObject getObject(String alias) throws SQLException {
+		StringBuilder column = new StringBuilder();
+		column.append("column ");
+		column.append(alias);
+		return toObject(rs.getCharacterStream(alias), column.toString());
+	}
+	/**
+	 * Parses the text of an object column, read as a stream. A new parser is
+	 * used on each call, since it keeps its reading state.
+	 *
+	 * @param reader The stream of the text, or null.
+	 * @param column The column, for error messages.
+	 * @return The object, or null if the stream is null.
+	 * @throws SQLException If the text is not a JSON object, or can not be read,
+	 *                      with the parse error as the cause.
+	 */
+	private static JSONObject toObject(Reader reader, String column) throws SQLException {
+		if (reader == null) {
+			return null;
+		}
+		try (reader) {
+			return new JSONParser().parse(reader);
+		} catch (IOException exc) {
+			StringBuilder msg = new StringBuilder();
+			msg.append("The value of ");
+			msg.append(column);
+			msg.append(" is not a JSON object: ");
+			msg.append(exc.getMessage());
+			throw new SQLException(msg.toString(), exc);
+		}
 	}
 }
