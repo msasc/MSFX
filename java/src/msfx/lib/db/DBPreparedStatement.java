@@ -17,6 +17,7 @@
 package msfx.lib.db;
 
 import msfx.lib.md.Types;
+import msfx.lib.util.json.JSONObject;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -43,7 +44,8 @@ import java.time.LocalTime;
  */
 public interface DBPreparedStatement extends DBStatementBase {
 	/**
-	 * BOOLEAN.
+	 * BOOLEAN, written as Y or N, as booleans are stored, not converted by the
+	 * driver.
 	 * @param index The parameter index, starting at 1.
 	 * @param x     The value.
 	 * @throws SQLException If an error occurs.
@@ -102,7 +104,7 @@ public interface DBPreparedStatement extends DBStatementBase {
 	void setDateTime(int index, LocalDateTime x) throws SQLException;
 
 	/**
-	 * STRING, and OBJECT as JSON text.
+	 * STRING, and OBJECT as JSON text, see {@link #setObject(int, JSONObject)}.
 	 * @param index The parameter index, starting at 1.
 	 * @param x     The value, or null.
 	 * @throws SQLException If an error occurs.
@@ -131,6 +133,14 @@ public interface DBPreparedStatement extends DBStatementBase {
 	 * @throws SQLException If an error occurs.
 	 */
 	void setBlob(int index, InputStream inputStream) throws SQLException;
+
+	/**
+	 * OBJECT, written as the text of the JSON object, stored in a CLOB.
+	 * @param index The parameter index, starting at 1.
+	 * @param x     The value, or null.
+	 * @throws SQLException If an error occurs.
+	 */
+	void setObject(int index, JSONObject x) throws SQLException;
 
 	/**
 	 * Sets a parameter to SQL NULL, for any type.

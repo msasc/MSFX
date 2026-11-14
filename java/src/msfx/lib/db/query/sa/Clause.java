@@ -32,5 +32,7 @@ public enum Clause {
 	/** A condition of the WHERE clause, without aggregates. */
 	WHERE,
 	/** The HAVING condition: aggregates of the select list, and no column outside them. */
-	HAVING
+	HAVING,
+	/** A value of an INSERT: a value without tables, so without columns, nor aggregates. */
+	VALUES
 }

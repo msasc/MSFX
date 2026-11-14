@@ -19,6 +19,8 @@ package msfx.lib.db.pool;
 import msfx.lib.db.DBPreparedStatement;
 import msfx.lib.db.DBResultSet;
 import msfx.lib.md.Types;
+import msfx.lib.util.json.JSONObject;
+import msfx.lib.util.json.JSONWriter;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -92,7 +94,7 @@ class PoolPreparedStatement implements DBPreparedStatement {
 	}
 	@Override
 	public void setBoolean(int index, boolean x) throws SQLException {
-		ps.setBoolean(index, x);
+		ps.setString(index, x ? "Y" : "N");
 	}
 
 	@Override
@@ -176,6 +178,16 @@ class PoolPreparedStatement implements DBPreparedStatement {
 	}
 
 	@Override
+	public void setObject(int index, JSONObject x) throws SQLException {
+		if (x == null) {
+			setNull(index, Types.OBJECT);
+		} else {
+			String text = new JSONWriter().toString(x);
+			ps.setString(index, text);
+		}
+	}
+
+	@Override
 	public void setNull(int index, Types type) throws SQLException {
 		ps.setNull(index, sqlType(type));
 	}
@@ -191,13 +203,11 @@ class PoolPreparedStatement implements DBPreparedStatement {
 
 	/**
 	 * @param type The MSFX type.
-	 * @return The JDBC type code used to set a null value of the type. OBJECT is
-	 *         stored as JSON text.
+	 * @return The JDBC type code used to set a null value of the type. BOOLEAN
+	 *         is stored as Y/N text and OBJECT as JSON text.
 	 */
 	private static int sqlType(Types type) {
 		int sqlType = switch (type) {
-			case BOOLEAN:
-				yield java.sql.Types.BOOLEAN;
 			case DECIMAL:
 				yield java.sql.Types.DECIMAL;
 			case DOUBLE:
@@ -212,6 +222,7 @@ class PoolPreparedStatement implements DBPreparedStatement {
 				yield java.sql.Types.TIME;
 			case DATETIME:
 				yield java.sql.Types.TIMESTAMP;
+			case BOOLEAN:
 			case STRING:
 			case OBJECT:
 				yield java.sql.Types.VARCHAR;

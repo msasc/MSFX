@@ -1013,13 +1013,7 @@ public class QSelect extends QBase {
 		List<String> aliases = null;
 		for (int i = 0; i < selects.length; i++) {
 			QSelect select = Objects.requireNonNull(selects[i], "Select can not be null");
-			if (select.getDBEngine() != getDBEngine()) {
-				throw new IllegalArgumentException("A wrapped select has another database engine");
-			}
-			if (select.orderBy != null) {
-				throw new IllegalArgumentException("A wrapped select can not have an ORDER BY clause");
-			}
-			select.checkExecutable();
+			select.checkNested(getDBEngine());
 			List<String> selectAliases = new ArrayList<>(select.columns.keySet());
 			if (i == 0) {
 				aliases = selectAliases;
@@ -1243,6 +1237,36 @@ public class QSelect extends QBase {
 			throw new IllegalStateException("An EXISTS select is executed only within its outer select");
 		}
 		checkGrouped();
+	}
+
+	/**
+	 * Checks that the select can be used inside another statement, wrapped by a
+	 * select or as the source of an insert: on the same engine, without ORDER
+	 * BY, and executable.
+	 *
+	 * @param db The engine of the other statement.
+	 * @throws IllegalArgumentException If the select has another engine or an
+	 *                                  ORDER BY clause.
+	 * @throws IllegalStateException    If the select can not be executed.
+	 */
+	void checkNested(DBEngine db) {
+		if (getDBEngine() != db) {
+			throw new IllegalArgumentException("A nested select has another database engine");
+		}
+		if (orderBy != null) {
+			throw new IllegalArgumentException("A nested select can not have an ORDER BY clause");
+		}
+		checkExecutable();
+	}
+
+	/**
+	 * Returns the number of columns of the select list, used by the statements
+	 * that nest the select.
+	 *
+	 * @return The number of columns.
+	 */
+	int getColumnCount() {
+		return columns.size();
 	}
 
 	/**

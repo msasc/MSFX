@@ -35,8 +35,9 @@ import msfx.lib.md.Value;
 public class Analysis {
 
 	/**
-	 * Parses and validates an expression: as a value for SELECT, as a condition
-	 * for the other clauses. This is the entry point of the query classes.
+	 * Parses and validates an expression: as a value for SELECT and VALUES, as a
+	 * condition for the other clauses. This is the entry point of the query
+	 * classes.
 	 *
 	 * @param expression The expression.
 	 * @param clause     The clause.
@@ -57,6 +58,7 @@ public class Analysis {
 		Parser parser = new Parser(expression);
 		Node root = switch (clause) {
 			case SELECT:
+			case VALUES:
 				yield parser.parseExpression();
 			case ON:
 			case WHERE:
