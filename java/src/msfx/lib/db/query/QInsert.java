@@ -19,6 +19,7 @@ package msfx.lib.db.query;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +32,9 @@ import msfx.lib.db.DBPreparedStatement;
 import msfx.lib.db.query.sa.Analysis;
 import msfx.lib.db.query.sa.Clause;
 import msfx.lib.md.Column;
+import msfx.lib.md.ColumnList;
+import msfx.lib.md.Index;
+import msfx.lib.md.Record;
 import msfx.lib.md.Table;
 import msfx.lib.md.Types;
 import msfx.lib.md.Value;
@@ -83,6 +87,12 @@ public class QInsert extends QBase {
 	 * expressions, the row of values and the select is set.
 	 */
 	private QSelect select = null;
+	/**
+	 * The column list of the records inserted with {@link #execute(Record)}, or
+	 * null while the insert is not used with records. Records that share it are
+	 * inserted without checking their columns again.
+	 */
+	private ColumnList recordColumns = null;
 
 	/**
 	 * Constructor.
@@ -294,6 +304,50 @@ public class QInsert extends QBase {
 	}
 
 	/**
+	 * Inserts a record into the table its columns belong to, on its own pooled
+	 * connection, with a prepared statement. A single record is inserted with
+	 * <code>new QInsert(db).execute(record)</code>.
+	 * <p>
+	 * The insert takes its table and its columns from the first record: all its
+	 * columns must belong to the same table, and the primary key columns must be
+	 * present. The following records must have the same columns, in the same
+	 * order; those that share the column list of the previous one, as the
+	 * records of a read do, are inserted without checking their columns again.
+	 * An insert used with records accepts no table, columns, row or select set
+	 * by hand, and the other way round.
+	 *
+	 * @param record The record.
+	 * @return The number of rows inserted.
+	 * @throws NullPointerException     If the record is null.
+	 * @throws IllegalArgumentException If the first record has no columns, a
+	 *                                  column of no table or of another table,
+	 *                                  or misses a primary key column, or a
+	 *                                  later record has other columns.
+	 * @throws IllegalStateException    If the table or the columns were set by
+	 *                                  hand.
+	 * @throws SQLException             If a database access error occurs.
+	 */
+	public int execute(Record record) throws SQLException {
+		Objects.requireNonNull(record, "Record can not be null");
+		ColumnList list = record.columns();
+		if (list != recordColumns) {
+			if (recordColumns == null) {
+				setFromRecord(list);
+			} else {
+				checkSameColumns(list);
+			}
+			recordColumns = list;
+		}
+		values.clear();
+		int size = record.size();
+		for (int i = 0; i < size; i++) {
+			Value value = record.getValue(i);
+			values.add(value);
+		}
+		return execute();
+	}
+
+	/**
 	 * Executes the statement on its own pooled connection: a row of values with
 	 * a prepared statement, a row of expressions or a select as SQL.
 	 *
@@ -387,19 +441,103 @@ public class QInsert extends QBase {
 		if (table == null) {
 			throw new IllegalStateException("The table must be set before the columns");
 		}
+		if (recordColumns != null) {
+			throw new IllegalStateException("The insert is used with records, its columns come from them");
+		}
 		if (!values.isEmpty() || !expressions.isEmpty() || select != null) {
 			throw new IllegalStateException("The columns can not be changed once a row or a select is set");
 		}
 	}
 
 	/**
-	 * Checks that a row or a select can be set: the columns are set.
+	 * Checks that a row or a select can be set: the columns are set, and the
+	 * insert is not used with records.
 	 *
-	 * @throws IllegalStateException If the columns are not set.
+	 * @throws IllegalStateException If the row or the select can not be set.
 	 */
 	private void checkSourceAllowed() {
+		if (recordColumns != null) {
+			throw new IllegalStateException("The insert is used with records, their values are the rows");
+		}
 		if (columns.isEmpty()) {
 			throw new IllegalStateException("The columns must be set before the row or the select");
+		}
+	}
+
+	/**
+	 * Sets the table and the columns from the column list of the first record:
+	 * the columns must belong all to the same table, and the primary key
+	 * columns of the table, if it has one, must be present.
+	 *
+	 * @param list The column list of the record.
+	 * @throws IllegalArgumentException If the record has no columns, a column
+	 *                                  belongs to no table or to another one, a
+	 *                                  column is repeated, or a column of the
+	 *                                  primary key is missing.
+	 * @throws IllegalStateException    If the table or the columns were set by
+	 *                                  hand.
+	 */
+	private void setFromRecord(ColumnList list) {
+		if (table != null || !columns.isEmpty()) {
+			throw new IllegalStateException("The table and the columns were set by hand, execute(Record) takes them from the records");
+		}
+		if (list.isEmpty()) {
+			throw new IllegalArgumentException("The record has no columns");
+		}
+		Table recordTable = list.get(0).getTable();
+		Map<String, Column> collected = new LinkedHashMap<>();
+		for (Column column : list) {
+			Table columnTable = column.getTable();
+			if (columnTable == null || !columnTable.equals(recordTable)) {
+				StringBuilder msg = new StringBuilder();
+				msg.append("Column ");
+				msg.append(column.getName());
+				msg.append(" of the record belongs to ");
+				if (columnTable == null) {
+					msg.append("no table");
+				} else {
+					msg.append("table ");
+					msg.append(columnTable.getName());
+				}
+				msg.append(": all the columns must belong to the same table");
+				throw new IllegalArgumentException(msg.toString());
+			}
+			putColumn(collected, column);
+		}
+		Index primaryKey = recordTable.getPrimaryKey();
+		if (primaryKey != null) {
+			for (Column column : primaryKey.getColumns()) {
+				if (!collected.containsKey(toKey(column.getName()))) {
+					StringBuilder msg = new StringBuilder();
+					msg.append("The record lacks column ");
+					msg.append(column.getName());
+					msg.append(" of the primary key of table ");
+					msg.append(recordTable.getName());
+					throw new IllegalArgumentException(msg.toString());
+				}
+			}
+		}
+		into(recordTable);
+		columns.putAll(collected);
+	}
+
+	/**
+	 * Checks that the column list of a record has the same columns as the one
+	 * of the previous records, in the same order.
+	 *
+	 * @param list The column list of the record.
+	 * @throws IllegalArgumentException If the columns differ.
+	 */
+	private void checkSameColumns(ColumnList list) {
+		boolean same = list.size() == columns.size();
+		Iterator<Column> previous = columns.values().iterator();
+		for (int i = 0; same && i < list.size(); i++) {
+			Column column = list.get(i);
+			Column other = previous.next();
+			same = column.equals(other);
+		}
+		if (!same) {
+			throw new IllegalArgumentException("The record has other columns than the previous ones, use a new QInsert");
 		}
 	}
 
