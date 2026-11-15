@@ -18,6 +18,7 @@ package msfx.lib.md;
 import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -44,14 +45,33 @@ import msfx.lib.util.Properties;
  */
 public class Column implements Copyable<Column> {
     /**
-     * Container for the column properties.
+     * The name of the column.
+     */
+    private final String name;
+    /**
+     * The data type of the column: type, length and decimals.
+     */
+    private final DataType dataType;
+    /**
+     * The table that owns the column, or null while it has not been added to a
+     * table.
+     */
+    private Table table;
+    /**
+     * Container for the other column properties.
      */
     private final Properties props = new Properties();
 
     /**
-     * Empty column, to be filled by {@link #copy(Copier)}.
+     * Column with a name and a data type, used by {@link #copy(Copier)}.
+     *
+     * @param name     The name of the column.
+     * @param dataType The data type.
+     * @throws NullPointerException If the name or the data type is null.
      */
-    private Column() {
+    private Column(String name, DataType dataType) {
+        this.name = Objects.requireNonNull(name, "Name can not be null");
+        this.dataType = Objects.requireNonNull(dataType, "Data type can not be null");
     }
 
     /**
@@ -60,10 +80,10 @@ public class Column implements Copyable<Column> {
      * @param length   The length of the column, -1 if not applicable.
      * @param decimals The number of decimal places for the column, -1 if not
      *                 applicable.
+     * @throws NullPointerException If the name or the type is null.
      */
     public Column(String name, Types type, int length, int decimals) {
-        props.putObject("data-type", new DataType(type, length, decimals));
-        props.put("name", name);
+        this(name, new DataType(type, length, decimals));
     }
 
     /**
@@ -76,9 +96,20 @@ public class Column implements Copyable<Column> {
      * @throws NullPointerException If the domain is null.
      */
     public Column(Domain domain) {
-        Objects.requireNonNull(domain, "Domain can not be null");
-        props.putObject("data-type", domain.getDataType());
-        props.put("name", domain.getName());
+        this(Objects.requireNonNull(domain, "Domain can not be null").getName(), domain);
+    }
+
+    /**
+     * Creates a column from a domain with another name, copying the rest as
+     * {@link #Column(Domain)} does. The data type is shared with the domain,
+     * since it is immutable.
+     *
+     * @param name   The name of the column.
+     * @param domain The domain.
+     * @throws NullPointerException If the name or the domain is null.
+     */
+    public Column(String name, Domain domain) {
+        this(name, Objects.requireNonNull(domain, "Domain can not be null").getDataType());
         if (domain.getHeader() != null) {
             props.put("header", domain.getHeader());
         }
@@ -98,30 +129,17 @@ public class Column implements Copyable<Column> {
     }
 
     /**
-     * Creates a column from a domain with another name, copying the rest as
-     * {@link #Column(Domain)} does.
-     *
-     * @param name   The name of the column.
-     * @param domain The domain.
-     * @throws NullPointerException If the domain is null.
-     */
-    public Column(String name, Domain domain) {
-        this(domain);
-        props.put("name", name);
-    }
-
-    /**
      * @return The name of the column.
      */
     public String getName() {
-        return props.getString("name");
+        return name;
     }
 
     /**
      * @return The data type of the column: type, length and decimals.
      */
     public DataType getDataType() {
-        return props.getObject("data-type", DataType.class);
+        return dataType;
     }
 
     /**
@@ -550,25 +568,58 @@ public class Column implements Copyable<Column> {
      *         to a table.
      */
     public Table getTable() {
-        return props.getObject("table", Table.class);
+        return table;
+    }
+
+    /**
+     * Compares the database structure of two columns: the name, ignoring case,
+     * the data type (type, length and decimals) and the table, both null or
+     * equal. The other properties, like nullable, the header or the default
+     * value, are behaviour, validation or user interface properties that may
+     * change over time, and are not compared.
+     *
+     * @param o The object to compare to.
+     * @return True if it is a column with the same name, data type and table.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Column other)) {
+            return false;
+        }
+        return name.equalsIgnoreCase(other.name) && dataType.equals(other.dataType) && Objects.equals(table, other.table);
+    }
+
+    /**
+     * Hash code consistent with {@link #equals(Object)}: from the name in upper
+     * case and the data type. The table is left out, since it is set when the
+     * column is added to it, and the hash code must not change afterwards.
+     *
+     * @return The hash code.
+     */
+    @Override
+    public int hashCode() {
+        String key = name.toUpperCase(Locale.ROOT);
+        return Objects.hash(key, dataType);
     }
 
     /**
      * Copies the column with all its properties except its table: the copy
      * belongs to no table until it is added to one. When a table is copied, its
-     * copy adds the copies of its columns.
+     * copy adds the copies of its columns. The data type is shared, since it is
+     * immutable.
      *
      * @param copier The copier of the copy operation.
      * @return The copy.
      */
     @Override
     public Column copy(Copier copier) {
-        Column copy = new Column();
+        Column copy = new Column(name, dataType);
         copier.register(this, copy);
         for (Object key : props.keys()) {
-            if (!key.equals("table")) {
-                copy.props.putObject(key, copier.copy(props.getObject(key, Object.class)));
-            }
+            copy.props.putObject(key, copier.copy(props.getObject(key, Object.class)));
         }
         return copy;
     }
@@ -580,6 +631,6 @@ public class Column implements Copyable<Column> {
      * @param table The owner table.
      */
     void setTable(Table table) {
-        props.putObject("table", table);
+        this.table = table;
     }
 }

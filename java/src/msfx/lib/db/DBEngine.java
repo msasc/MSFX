@@ -112,6 +112,12 @@ public abstract class DBEngine {
 	 * Catalog of the domains and tables of the schemas.
 	 */
 	private final Catalog catalog = new Catalog();
+	/**
+	 * Key of the database the engine is connected to, adapter, host, port and
+	 * database in upper case, or null before {@link #connectTo(String, String,
+	 * String)}.
+	 */
+	private String databaseKey;
 
 	/**
 	 * Constructor. Internally initializes the connection pool.
@@ -142,19 +148,53 @@ public abstract class DBEngine {
 	protected abstract String getURL(String cnString);
 
 	/**
-	 * Sets the connection settings. Connections are opened later, when requested.
+	 * Returns the key of the database a connection string refers to:
+	 * ADAPTER:HOST:PORT:DATABASE in upper case, without the user nor the driver
+	 * options, since they change how the database is accessed, not which one.
+	 *
+	 * @param cnString The connection string, the engine specific part of the URL.
+	 * @return The key.
+	 * @throws IllegalArgumentException If the connection string does not name
+	 *                                  the host and the database in a form the
+	 *                                  adapter can read.
+	 */
+	protected abstract String getDatabaseKey(String cnString);
+
+	/**
+	 * Sets the connection settings, once: an engine is connected to one
+	 * database. Connections are opened later, when requested. The key of the
+	 * database is computed and given to the catalog, which sets it to the tables
+	 * it returns.
 	 *
 	 * @param cnString The connection string, the engine specific part of the URL.
 	 * @param user     The user, or null if the driver does not need it, for instance
 	 *                 with integrated security.
 	 * @param password The password, or null if the driver does not need it.
-	 * @throws IllegalArgumentException If the connection string is null.
+	 * @throws IllegalArgumentException If the connection string is null, or the
+	 *                                  adapter can not read the host and the
+	 *                                  database from it.
+	 * @throws IllegalStateException    If the engine is already connected.
 	 */
 	public final void connectTo(String cnString, String user, String password) {
+		if (databaseKey != null) {
+			throw new IllegalStateException("The engine is already connected, connectTo is called once");
+		}
 		checkNotNull(cnString, "Connection string");
+		String key = getDatabaseKey(cnString);
 		props.put(PROP_URL, getURL(cnString));
 		putOrRemove(PROP_USER, user);
 		putOrRemove(PROP_PASSWORD, password);
+		databaseKey = key;
+		catalog.setDatabaseKey(key);
+	}
+
+	/**
+	 * @return The key of the database the engine is connected to,
+	 *         ADAPTER:HOST:PORT:DATABASE in upper case, or null if not connected
+	 *         yet.
+	 */
+	public final String getDatabaseKey() {
+		return databaseKey;
 	}
 
 	/**

@@ -18,6 +18,7 @@ package msfx.lib.md;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import msfx.lib.util.Copier;
@@ -43,29 +44,33 @@ import msfx.lib.util.Properties;
  */
 public class Table implements Copyable<Table> {
     /**
+     * The name of the table.
+     */
+    private final String name;
+    /**
+     * The schema of the table, or null while it is not set.
+     */
+    private String schema;
+    /**
+     * The key of the database of the table, or null while it is not set.
+     */
+    private String databaseKey;
+    /**
      * The columns of the table.
      */
     private final ColumnList columns = new ColumnList();
     /**
-     * Container for the table properties.
+     * Container for the other table properties.
      */
     private final Properties props = new Properties();
-
-    /**
-     * Empty table, to be filled by {@link #copy(Copier)}.
-     */
-    private Table() {
-        columns.setInterceptor((alias, column) -> intercept(alias, column));
-    }
 
     /**
      * @param name The name of the table.
      * @throws NullPointerException If the name is null.
      */
     public Table(String name) {
-        this();
-        Objects.requireNonNull(name, "Name can not be null");
-        props.put("name", name);
+        this.name = Objects.requireNonNull(name, "Name can not be null");
+        columns.setInterceptor((alias, column) -> intercept(alias, column));
     }
 
     /**
@@ -79,7 +84,9 @@ public class Table implements Copyable<Table> {
      */
     @Override
     public Table copy(Copier copier) {
-        Table copy = new Table();
+        Table copy = new Table(name);
+        copy.schema = schema;
+        copy.databaseKey = databaseKey;
         copier.register(this, copy);
         /* The columns first, so the indexes and foreign keys resolve to their copies. */
         for (Column column : columns) {
@@ -95,7 +102,7 @@ public class Table implements Copyable<Table> {
      * @return The name of the table.
      */
     public String getName() {
-        return props.getString("name");
+        return name;
     }
 
     /**
@@ -103,7 +110,7 @@ public class Table implements Copyable<Table> {
      *         the table is defined, but when it is accessed through the catalog.
      */
     public String getSchema() {
-        return props.getString("schema", null);
+        return schema;
     }
 
     /**
@@ -111,8 +118,62 @@ public class Table implements Copyable<Table> {
      * @throws NullPointerException If the schema is null.
      */
     public void setSchema(String schema) {
-        Objects.requireNonNull(schema, "Schema can not be null");
-        props.put("schema", schema);
+        this.schema = Objects.requireNonNull(schema, "Schema can not be null");
+    }
+
+    /**
+     * @return The key of the database of the table, or null if not set. It is
+     *         not set when the table is defined, but when it is accessed
+     *         through the catalog of an engine.
+     */
+    public String getDatabaseKey() {
+        return databaseKey;
+    }
+
+    /**
+     * @param databaseKey The key of the database of the table.
+     * @throws NullPointerException If the key is null.
+     */
+    public void setDatabaseKey(String databaseKey) {
+        this.databaseKey = Objects.requireNonNull(databaseKey, "Database key can not be null");
+    }
+
+    /**
+     * Compares the database object of two tables, not their definitions: the
+     * database key, both null or equal, and the schema and the name, ignoring
+     * case. Tables defined on the fly, without key nor schema, are compared by
+     * name.
+     *
+     * @param o The object to compare to.
+     * @return True if it is a table with the same database key, schema and
+     *         name.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Table other)) {
+            return false;
+        }
+        if (!Objects.equals(databaseKey, other.databaseKey)) {
+            return false;
+        }
+        boolean sameSchema = schema == null ? other.schema == null : schema.equalsIgnoreCase(other.schema);
+        return sameSchema && name.equalsIgnoreCase(other.name);
+    }
+
+    /**
+     * Hash code consistent with {@link #equals(Object)}: from the name in upper
+     * case. The schema and the database key are left out, since they are set
+     * after the table is defined, and the hash code must not change afterwards.
+     *
+     * @return The hash code.
+     */
+    @Override
+    public int hashCode() {
+        String key = name.toUpperCase(Locale.ROOT);
+        return key.hashCode();
     }
 
     /**

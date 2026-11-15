@@ -43,9 +43,16 @@ desktop and task concurrency packages) must be as well defined as possible.
 - **No design ahead.** Build only the operations the stated usage needs. When a
   gap seems to need extra machinery, first ask whether the operation causing
   it is needed at all.
-- **md state lives in Properties.** Metadata classes keep all their state in
-  their `Properties`, non-standard values with `putObject`, never in fields.
-  Metadata is complete at definition time; later misuse is not guarded.
+- **md state.** The structural definition of a metadata object (name, data
+  type, owner table, schema, database key) is held in fields, final where it
+  can be, and read directly; all the other state lives in its `Properties`,
+  non-standard values with `putObject`. Metadata is complete at definition
+  time; later misuse is not guarded.
+- **md equality.** By value, never by reference: front and back ends may
+  exchange metadata. Only the database structure is compared: a domain by name
+  (ignoring case) and data type, a column by name, data type and table, a
+  table by database key, schema and name (ignoring case). Behaviour,
+  validation and user interface properties are not compared.
 - **Tables are md objects.** A `Table` is either defined by the application or
   read from the database through `DatabaseMetaData`. Query classes take md
   objects (`Table`, `Column`, `Index`), never names, and validate that they

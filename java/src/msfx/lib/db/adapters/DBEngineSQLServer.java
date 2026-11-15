@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 import msfx.lib.db.DBEngine;
 import msfx.lib.db.query.sa.Function;
@@ -287,6 +288,57 @@ public class DBEngineSQLServer extends DBEngine {
 		url.append("jdbc:sqlserver://");
 		url.append(cnString);
 		return url.toString();
+	}
+
+	/**
+	 * Reads the key from a connection string like
+	 * <code>host[\instance][:port];databaseName=name;...</code>: the host with
+	 * its instance, a different server, the port, 1433 if not given, and the
+	 * database, named by the property databaseName or database.
+	 */
+	@Override
+	protected String getDatabaseKey(String cnString) {
+		String[] parts = cnString.split(";");
+		String server = parts[0].trim();
+		String host = server;
+		String port = "1433";
+		int colon = server.indexOf(':');
+		if (colon >= 0) {
+			host = server.substring(0, colon);
+			port = server.substring(colon + 1);
+		}
+		String database = null;
+		for (int i = 1; i < parts.length; i++) {
+			int equal = parts[i].indexOf('=');
+			if (equal < 0) {
+				continue;
+			}
+			String name = parts[i].substring(0, equal).trim();
+			if (name.equalsIgnoreCase("databaseName") || name.equalsIgnoreCase("database")) {
+				database = parts[i].substring(equal + 1).trim();
+			}
+		}
+		if (host.isEmpty()) {
+			StringBuilder msg = new StringBuilder();
+			msg.append("The connection string must name the host: ");
+			msg.append(cnString);
+			throw new IllegalArgumentException(msg.toString());
+		}
+		if (database == null || database.isEmpty()) {
+			StringBuilder msg = new StringBuilder();
+			msg.append("The connection string must name the database with databaseName: ");
+			msg.append(cnString);
+			throw new IllegalArgumentException(msg.toString());
+		}
+		StringBuilder key = new StringBuilder();
+		key.append(getAdapter());
+		key.append(":");
+		key.append(host.toUpperCase(Locale.ROOT));
+		key.append(":");
+		key.append(port);
+		key.append(":");
+		key.append(database.toUpperCase(Locale.ROOT));
+		return key.toString();
 	}
 
 	/**

@@ -17,6 +17,7 @@ package msfx.lib.md;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -45,15 +46,17 @@ import msfx.lib.util.Properties;
  */
 public class Domain implements Copyable<Domain> {
     /**
-     * Container for the domain properties.
+     * The name of the domain.
+     */
+    private final String name;
+    /**
+     * The data type of the domain: type, length and decimals.
+     */
+    private final DataType dataType;
+    /**
+     * Container for the other domain properties.
      */
     private final Properties props = new Properties();
-
-    /**
-     * Empty domain, to be filled by {@link #copy(Copier)}.
-     */
-    private Domain() {
-    }
 
     /**
      * @param name     The name of the domain.
@@ -61,35 +64,37 @@ public class Domain implements Copyable<Domain> {
      * @param length   The length of the domain, -1 if not applicable.
      * @param decimals The number of decimal places for the domain, -1 if not
      *                 applicable.
-     * @throws NullPointerException If the type is null.
+     * @throws NullPointerException If the name or the type is null.
      */
     public Domain(String name, Types type, int length, int decimals) {
         this(name, new DataType(type, length, decimals));
     }
 
     /**
-     * Domain that shares a data type, used by {@link Column#getDomain()}.
+     * Domain that shares a data type, used by {@link Column#getDomain()} and
+     * {@link #copy(Copier)}.
      *
      * @param name     The name of the domain.
      * @param dataType The data type.
+     * @throws NullPointerException If the name or the data type is null.
      */
     Domain(String name, DataType dataType) {
-        props.putObject("data-type", dataType);
-        props.put("name", name);
+        this.name = Objects.requireNonNull(name, "Name can not be null");
+        this.dataType = Objects.requireNonNull(dataType, "Data type can not be null");
     }
 
     /**
      * @return The name of the domain.
      */
     public String getName() {
-        return props.getString("name");
+        return name;
     }
 
     /**
      * @return The data type of the domain: type, length and decimals.
      */
     public DataType getDataType() {
-        return props.getObject("data-type", DataType.class);
+        return dataType;
     }
 
     /**
@@ -302,14 +307,47 @@ public class Domain implements Copyable<Domain> {
     }
 
     /**
-     * Copies the domain with all its properties.
+     * Compares the database structure of two domains: the name, ignoring case,
+     * and the data type (type, length and decimals). The other properties,
+     * like the header, the label or the default value, are user interface or
+     * validation properties that may change over time, and are not compared.
+     *
+     * @param o The object to compare to.
+     * @return True if it is a domain with the same name and data type.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Domain other)) {
+            return false;
+        }
+        return name.equalsIgnoreCase(other.name) && dataType.equals(other.dataType);
+    }
+
+    /**
+     * Hash code consistent with {@link #equals(Object)}: from the name in upper
+     * case and the data type.
+     *
+     * @return The hash code.
+     */
+    @Override
+    public int hashCode() {
+        String key = name.toUpperCase(Locale.ROOT);
+        return Objects.hash(key, dataType);
+    }
+
+    /**
+     * Copies the domain with all its properties. The data type is shared, since
+     * it is immutable.
      *
      * @param copier The copier of the copy operation.
      * @return The copy.
      */
     @Override
     public Domain copy(Copier copier) {
-        Domain copy = new Domain();
+        Domain copy = new Domain(name, dataType);
         copier.register(this, copy);
         for (Object key : props.keys()) {
             copy.props.putObject(key, copier.copy(props.getObject(key, Object.class)));

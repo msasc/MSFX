@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 import msfx.lib.db.DBEngine;
 import msfx.lib.db.query.sa.Function;
@@ -270,6 +271,56 @@ public class DBEngineOracle extends DBEngine {
 		url.append("jdbc:oracle:thin:@");
 		url.append(cnString);
 		return url.toString();
+	}
+
+	/**
+	 * Reads the key from a connection string like
+	 * <code>[//]host[:port]/service</code> or <code>host[:port]:SID</code>,
+	 * the port 1521 if not given. TNS descriptors are not read.
+	 */
+	@Override
+	protected String getDatabaseKey(String cnString) {
+		String text = cnString.trim();
+		if (text.startsWith("//")) {
+			text = text.substring(2);
+		}
+		String server = null;
+		String database = null;
+		int slash = text.indexOf('/');
+		if (!text.startsWith("(")) {
+			if (slash >= 0) {
+				server = text.substring(0, slash);
+				database = text.substring(slash + 1);
+			} else {
+				int last = text.lastIndexOf(':');
+				if (last > 0 && text.indexOf(':') < last) {
+					server = text.substring(0, last);
+					database = text.substring(last + 1);
+				}
+			}
+		}
+		if (server == null || server.isEmpty() || database == null || database.isEmpty()) {
+			StringBuilder msg = new StringBuilder();
+			msg.append("The connection string must be host:port/service or host:port:SID: ");
+			msg.append(cnString);
+			throw new IllegalArgumentException(msg.toString());
+		}
+		String host = server;
+		String port = "1521";
+		int colon = server.indexOf(':');
+		if (colon >= 0) {
+			host = server.substring(0, colon);
+			port = server.substring(colon + 1);
+		}
+		StringBuilder key = new StringBuilder();
+		key.append(getAdapter());
+		key.append(":");
+		key.append(host.toUpperCase(Locale.ROOT));
+		key.append(":");
+		key.append(port);
+		key.append(":");
+		key.append(database.toUpperCase(Locale.ROOT));
+		return key.toString();
 	}
 
 	/**

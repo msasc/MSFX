@@ -79,11 +79,40 @@ public class Catalog {
      * Lock that guards the providers.
      */
     private final ReentrantLock lockProviders = new ReentrantLock();
+    /**
+     * Key of the database of the engine that owns the catalog, set to the
+     * tables it returns, or null for a catalog without engine.
+     */
+    private volatile String databaseKey;
 
     /**
      * Constructor.
      */
     public Catalog() {
+    }
+
+    /**
+     * Sets the key of the database of the engine that owns the catalog, once,
+     * when the engine is connected. The tables returned afterwards get it.
+     *
+     * @param databaseKey The key.
+     * @throws NullPointerException  If the key is null.
+     * @throws IllegalStateException If the key is already set.
+     */
+    public void setDatabaseKey(String databaseKey) {
+        Objects.requireNonNull(databaseKey, "Database key can not be null");
+        if (this.databaseKey != null) {
+            throw new IllegalStateException("The database key is already set");
+        }
+        this.databaseKey = databaseKey;
+    }
+
+    /**
+     * @return The key of the database of the engine that owns the catalog, or
+     *         null if not set.
+     */
+    public String getDatabaseKey() {
+        return databaseKey;
     }
 
     /**
@@ -142,8 +171,8 @@ public class Catalog {
 
     /**
      * Returns a table of a schema. The definition returned by a provider is
-     * copied, the copy gets the schema and is kept, and the providers are not
-     * asked again for it.
+     * copied, the copy gets the schema and the database key, if the catalog has
+     * one, and is kept, and the providers are not asked again for it.
      * <p>
      * The first time a table is requested, all the providers are asked, to check
      * that only one of them defines it.
@@ -202,6 +231,10 @@ public class Catalog {
         /* Copy, so the provider's design is not changed and each schema has its own table. */
         Table table = design.copy();
         table.setSchema(schema);
+        String dbKey = databaseKey;
+        if (dbKey != null) {
+            table.setDatabaseKey(dbKey);
+        }
         lockTables.lock();
         try {
             /* Another thread may have kept it meanwhile: the first one kept wins. */
