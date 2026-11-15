@@ -124,11 +124,6 @@ public class QSelect extends QBase {
 	 * domain or none has.
 	 */
 	private final ColumnList recordColumns = new ColumnList();
-	/**
-	 * Data types of the record columns, by index, so that each row read does
-	 * not look them up in the column properties.
-	 */
-	private final List<DataType> recordDataTypes = new ArrayList<>();
 
 	/**
 	 * WHERE clause, written only when it has conditions.
@@ -352,7 +347,6 @@ public class QSelect extends QBase {
 		columns.put(key, new QExpr(expr, alias, domain, scope()));
 		if (domain != null) {
 			recordColumns.add(new Column(alias, domain));
-			recordDataTypes.add(domain.getDataType());
 		}
 	}
 
@@ -878,11 +872,12 @@ public class QSelect extends QBase {
 		if (recordColumns.isEmpty()) {
 			throw new IllegalStateException("The columns of the select have no domain");
 		}
-		int size = recordDataTypes.size();
+		int size = recordColumns.size();
 		Value[] values = new Value[size];
 		for (int i = 0; i < size; i++) {
 			int index = i + 1;
-			DataType dataType = recordDataTypes.get(i);
+			Column column = recordColumns.get(i);
+			DataType dataType = column.getDataType();
 			Value value = switch (dataType.type()) {
 				case BOOLEAN:
 					yield new Value(rs.getBoolean(index));

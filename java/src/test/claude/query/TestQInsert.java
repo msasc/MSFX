@@ -298,6 +298,22 @@ public class TestQInsert {
 		error("Empty array of names", IllegalArgumentException.class, () -> intoTmp(SQLSERVER).columns(new String[0]));
 		error("Column of another table", IllegalArgumentException.class,
 				() -> intoTmp(SQLSERVER).columns(pieces.columns().get("CPTYPE")));
+		Table piecesTmpOther = new Table("tpieces_tmp");
+		piecesTmpOther.setSchema(CatalogCMA.SCHEMA);
+		for (Column column : pieces.columns()) {
+			Column copy = new Column(column.getName(), column.getDomain());
+			piecesTmpOther.columns().add(copy);
+		}
+		String equalTable;
+		try {
+			QInsert i = intoTmp(SQLSERVER);
+			i.columns(piecesTmpOther.columns().get("CPTYPE"), piecesTmpOther.columns().get("DPTYPE"));
+			equalTable = i.toString();
+		} catch (RuntimeException exc) {
+			equalTable = exc.getMessage();
+		}
+		report(equalTable.equals("INSERT INTO [EXPLMARG_QLT].[TPIECES_TMP] ([CPTYPE], [DPTYPE])"),
+				"Columns of an equal table, another instance", equalTable, "accepted");
 		error("Columns changed once a row is set", IllegalStateException.class, () -> {
 			QInsert i = intoTmp(SQLSERVER);
 			i.columns("CPTYPE");

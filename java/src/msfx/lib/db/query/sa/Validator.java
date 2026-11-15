@@ -331,7 +331,7 @@ public class Validator {
 		}
 		boolean same = switch (node.getKind()) {
 			case COLUMN:
-				yield columns.get(node) == from.getColumn(other)
+				yield Objects.equals(columns.get(node), from.getColumn(other))
 						&& aliases.get(node).equalsIgnoreCase(from.getAlias(other));
 			case LITERAL:
 				yield node.getValue().equals(other.getValue());

@@ -151,7 +151,7 @@ public class QInsert extends QBase {
 		Map<String, Column> list = new LinkedHashMap<>();
 		for (Column column : columns) {
 			Objects.requireNonNull(column, "Column can not be null");
-			if (column.getTable() != table) {
+			if (!table.equals(column.getTable())) {
 				StringBuilder msg = new StringBuilder();
 				msg.append("Column ");
 				msg.append(column.getName());
