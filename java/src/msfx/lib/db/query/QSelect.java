@@ -118,10 +118,10 @@ public class QSelect extends QBase {
 	 */
 	private final Map<String, QExpr> columns = new LinkedHashMap<>();
 	/**
-	 * Columns of the records read, one per column of the select list, named
-	 * after its alias, with the definition of its domain, in the order they were
-	 * added. Empty when the columns have no domain: all the columns have a
-	 * domain or none has.
+	 * Columns of the records read, one per column of the select list, under its
+	 * alias, in the order they were added: a column created from the domain, or
+	 * a copy of the column given, that keeps its table. Empty when the columns
+	 * have no domain nor column: all the columns have one or none has.
 	 */
 	private final ColumnList recordColumns = new ColumnList();
 
@@ -286,18 +286,20 @@ public class QSelect extends QBase {
 	 * @throws msfx.lib.db.query.sa.SyntaxException If the expression is wrong.
 	 */
 	public void addColumn(String expr, String alias) {
-		addColumn(expr, alias, null);
+		putColumn(expr, alias, null);
 	}
 
 	/**
-	 * Adds a column to the select list, with the domain that defines its type.
-	 * The expression can use the columns of the tables already registered, so
-	 * columns are added after the FROM clause and the joins they use.
+	 * Adds a column to the select list, with the domain that defines it in the
+	 * records read: the records get a column named after the alias, that belongs
+	 * to no table. The expression can use the columns of the tables already
+	 * registered, so columns are added after the FROM clause and the joins they
+	 * use.
 	 *
 	 * @param expr   The expression.
 	 * @param alias  The alias of the column in the result, unique ignoring case.
-	 * @param domain The domain, or null. All the columns have a domain or none
-	 *               has.
+	 * @param domain The domain, or null. All the columns have a domain or a
+	 *               column, or none has.
 	 * @throws NullPointerException                 If the expression or the alias
 	 *                                              is null.
 	 * @throws IllegalArgumentException             If the alias is blank or
@@ -312,6 +314,55 @@ public class QSelect extends QBase {
 	 * @throws msfx.lib.db.query.sa.SyntaxException If the expression is wrong.
 	 */
 	public void addColumn(String expr, String alias, Domain domain) {
+		Objects.requireNonNull(alias, "Alias can not be null");
+		Column recordColumn = domain == null ? null : new Column(alias, domain);
+		putColumn(expr, alias, recordColumn);
+	}
+
+	/**
+	 * Adds a column to the select list, with the column that describes it in
+	 * the records read. A column of a table, given for an expression that is
+	 * that very column, makes the records read refer to the table, so that they
+	 * can be used to update it; a column of no table, as
+	 * <code>new Column(alias, domain)</code>, only defines the value. The
+	 * records get a copy of the column, that keeps its table, so that changes to
+	 * its header, label or other properties do not reach the table. The
+	 * expression can use the columns of the tables already registered, so
+	 * columns are added after the FROM clause and the joins they use.
+	 *
+	 * @param expr   The expression.
+	 * @param alias  The alias of the column in the result, unique ignoring case.
+	 * @param column The column, or null. All the columns have a domain or a
+	 *               column, or none has.
+	 * @throws NullPointerException                 If the expression or the alias
+	 *                                              is null.
+	 * @throws IllegalArgumentException             If the alias is blank or
+	 *                                              already used, the column has a
+	 *                                              column and the previous ones
+	 *                                              have none, or the other way
+	 *                                              round, or the column belongs to
+	 *                                              a table and the expression is
+	 *                                              not that column.
+	 * @throws IllegalStateException                If the FROM clause is not set,
+	 *                                              or the select has already the
+	 *                                              maximum number of columns of
+	 *                                              the database.
+	 * @throws msfx.lib.db.query.sa.SyntaxException If the expression is wrong.
+	 */
+	public void addColumn(String expr, String alias, Column column) {
+		Column recordColumn = column == null ? null : new Column(column);
+		putColumn(expr, alias, recordColumn);
+	}
+
+	/**
+	 * Adds a column to the select list, with the column of the records read,
+	 * already created for the select.
+	 *
+	 * @param expr         The expression.
+	 * @param alias        The alias.
+	 * @param recordColumn The column of the records read, or null.
+	 */
+	private void putColumn(String expr, String alias, Column recordColumn) {
 		if (from == null) {
 			throw new IllegalStateException("The FROM clause must be set before the columns");
 		}
@@ -335,18 +386,19 @@ public class QSelect extends QBase {
 			msg.append(db.getAdapter());
 			throw new IllegalStateException(msg.toString());
 		}
-		/* Validate mixing call with and without domain */
-		boolean canAdd = (domain != null && columns.size() == recordColumns.size());
-		canAdd |= (domain == null && recordColumns.isEmpty());
+		/* Validate mixing calls with and without domain or column */
+		boolean canAdd = (recordColumn != null && columns.size() == recordColumns.size());
+		canAdd |= (recordColumn == null && recordColumns.isEmpty());
 		if (!canAdd) {
 			StringBuilder msg = new StringBuilder();
-			msg.append("You are mixing call with and without a Domain");
+			msg.append("You are mixing calls with and without a domain or column");
 			throw new IllegalArgumentException(msg.toString());
 		}
 		/* Do add it. */
-		columns.put(key, new QExpr(expr, alias, domain, scope()));
-		if (domain != null) {
-			recordColumns.add(new Column(alias, domain));
+		QExpr column = new QExpr(expr, alias, recordColumn, scope());
+		columns.put(key, column);
+		if (recordColumn != null) {
+			recordColumns.add(alias, recordColumn);
 		}
 	}
 
@@ -824,9 +876,10 @@ public class QSelect extends QBase {
 
 	/**
 	 * Returns the columns of the records read: one column per column of the
-	 * select, in the order of the select, named after its alias, with the
-	 * definition of its domain. The columns are created when added to the
-	 * select and belong to no table.
+	 * select, in the order of the select, under its alias. A column created from
+	 * a domain is named after the alias and belongs to no table; a column given
+	 * as a column is a copy of it, with its name, and keeps its table, so that
+	 * the records refer to the table where they hold its values.
 	 * <p>
 	 * The list returned is the one of the select, shared by the records it
 	 * reads. Changes made to it or its columns show in the records read

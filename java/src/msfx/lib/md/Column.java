@@ -129,6 +129,27 @@ public class Column implements Copyable<Column> {
     }
 
     /**
+     * Creates a copy of a column that keeps its table, to use the column apart
+     * from the table, for instance in the select list of a query, with its own
+     * header, label or other properties. The copy refers to the table but is
+     * not one of its columns: it is equal to the original, and changes to its
+     * properties do not reach it. The data type is shared, since it is
+     * immutable.
+     *
+     * @param column The column to copy.
+     * @throws NullPointerException If the column is null.
+     */
+    public Column(Column column) {
+        this(Objects.requireNonNull(column, "Column can not be null").name, column.dataType);
+        this.table = column.table;
+        Copier copier = new Copier();
+        for (Object key : column.props.keys()) {
+            Object value = column.props.getObject(key, Object.class);
+            props.putObject(key, copier.copy(value));
+        }
+    }
+
+    /**
      * @return The name of the column.
      */
     public String getName() {

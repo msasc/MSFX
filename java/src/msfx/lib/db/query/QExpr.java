@@ -31,12 +31,13 @@ import msfx.lib.md.Types;
 
 /**
  * A column of the select list: an expression, the alias of the column in the
- * result, and optionally the domain that defines its type, to read the result
- * into records.
+ * result, and optionally the column that describes it in the records read.
  * <p>
  * The expression is validated when the column is created, against the tables
  * registered at that moment: it can use their columns, and have one aggregate
- * at most, being the whole expression.
+ * at most, being the whole expression. A record column that belongs to a table
+ * is accepted only for an expression that is that very column, so that the
+ * records read refer to their table only where they hold its values.
  * <p>
  * Created only by its select.
  *
@@ -53,30 +54,64 @@ public class QExpr {
 	 */
 	private final String alias;
 	/**
-	 * The domain that defines the type of the column, or null.
+	 * The column that describes the expression in the records read, or null.
 	 */
-	private final Domain domain;
+	private final Column column;
 
 	/**
 	 * Constructor.
 	 *
 	 * @param expr   The expression.
 	 * @param alias  The alias of the column in the result.
-	 * @param domain The domain, or null.
+	 * @param column The column of the records read, or null.
 	 * @param tables The tables the expression can use, by alias.
 	 * @throws NullPointerException                 If the expression or the alias
 	 *                                              is null.
-	 * @throws IllegalArgumentException             If the alias is blank.
+	 * @throws IllegalArgumentException             If the alias is blank, or the
+	 *                                              column belongs to a table and
+	 *                                              the expression is not that
+	 *                                              column.
 	 * @throws msfx.lib.db.query.sa.SyntaxException If the expression is wrong.
 	 */
-	QExpr(String expr, String alias, Domain domain, Map<String, Table> tables) {
+	QExpr(String expr, String alias, Column column, Map<String, Table> tables) {
 		Objects.requireNonNull(expr, "Expression can not be null");
 		this.alias = Objects.requireNonNull(alias, "Alias can not be null");
 		if (alias.isBlank()) {
 			throw new IllegalArgumentException("Alias can not be blank");
 		}
-		this.domain = domain;
 		this.analysis = Analysis.analyze(expr, Clause.SELECT, tables, List.of(), List.of());
+		if (column != null && column.getTable() != null) {
+			Column referenced = getReferencedColumn();
+			if (!column.equals(referenced)) {
+				StringBuilder msg = new StringBuilder();
+				msg.append("Column ");
+				msg.append(column.getName());
+				msg.append(" of table ");
+				msg.append(column.getTable().getName());
+				msg.append(" is given for ");
+				msg.append(expr);
+				msg.append(", which is not that column");
+				throw new IllegalArgumentException(msg.toString());
+			}
+		}
+		this.column = column;
+	}
+
+	/**
+	 * Returns the column the expression is, when it is a plain column, ignoring
+	 * the parentheses around it.
+	 *
+	 * @return The column, or null if the expression is not a plain column.
+	 */
+	private Column getReferencedColumn() {
+		Node node = analysis.getRoot();
+		while (node.getKind() == Node.Kind.GROUP) {
+			node = node.getChildren().get(0);
+		}
+		if (node.getKind() != Node.Kind.COLUMN) {
+			return null;
+		}
+		return analysis.getColumn(node);
 	}
 
 	/**
@@ -133,24 +168,21 @@ public class QExpr {
 
 	/**
 	 * Creates the column of a wrapping select's table that stands for this
-	 * column of a wrapped select, named after the alias. Its type is the type of
-	 * the domain if it has one, the type of the column if the expression is a
-	 * plain column, and otherwise OBJECT, not known: types are not validated, the
-	 * database checks them.
+	 * column of a wrapped select, named after the alias. Its definition is the
+	 * one of the record column if it has one, the type of the column if the
+	 * expression is a plain column, and otherwise OBJECT, not known: types are
+	 * not validated, the database checks them.
 	 *
 	 * @return The column.
 	 */
 	Column createColumn() {
-		if (domain != null) {
+		if (column != null) {
+			Domain domain = column.getDomain();
 			return new Column(alias, domain);
 		}
-		Node node = analysis.getRoot();
-		while (node.getKind() == Node.Kind.GROUP) {
-			node = node.getChildren().get(0);
-		}
-		if (node.getKind() == Node.Kind.COLUMN) {
-			Column column = analysis.getColumn(node);
-			return new Column(alias, column.getType(), column.getLength(), column.getDecimals());
+		Column referenced = getReferencedColumn();
+		if (referenced != null) {
+			return new Column(alias, referenced.getType(), referenced.getLength(), referenced.getDecimals());
 		}
 		return new Column(alias, Types.OBJECT, -1, -1);
 	}
