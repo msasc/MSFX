@@ -275,6 +275,7 @@ public class Validator {
 			case ON:
 			case WHERE:
 			case VALUES:
+			case SET:
 				yield false;
 		};
 		if (!accepted) {

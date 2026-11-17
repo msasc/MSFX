@@ -29,6 +29,7 @@ import msfx.lib.db.DBEngine;
 import msfx.lib.db.query.QDelete;
 import msfx.lib.db.query.QInsert;
 import msfx.lib.db.query.QSelect;
+import msfx.lib.db.query.QUpdate;
 import msfx.lib.db.query.QWhere;
 import msfx.lib.db.query.sa.SyntaxException;
 import msfx.lib.md.Column;
@@ -478,7 +479,183 @@ public class TestQDML {
 		int single = new QInsert(SQLSERVER).execute(new Record(own.get(0).columns(), one));
 		equal("A single record in one line", String.valueOf(single), "1");
 
+		updateRuns(own);
 		deleteRuns(own);
+	}
+
+	/**
+	 * Returns a new update of TPIECES_TMP P.
+	 *
+	 * @param db The database engine.
+	 * @return The update.
+	 */
+	private static QUpdate updateTmp(DBEngine db) {
+		QUpdate update = new QUpdate(db);
+		update.table(piecesTmp, "P");
+		return update;
+	}
+
+	/**
+	 * Checks the SQL written by an update built by hand.
+	 */
+	private static void updateStatements() {
+		section("UPDATE: SQL");
+		QUpdate update = new QUpdate(SQLSERVER);
+		sql("Empty update", update, "");
+		update.table(piecesTmp, "P");
+		update.set("dptype", "UPPER(P.DPTYPE) || '-' || P.CUNIT");
+		update.set(piecesTmp.columns().get("ISPAREPART"), new Value(true));
+		update.getWhere().value("P.CBUSINESS", EQ, "ACRI");
+		sql("Expression and value, SQL Server", update, lines(
+				"UPDATE [P]",
+				"SET [DPTYPE] = CONCAT(UPPER([P].[DPTYPE]), N'-', [P].[CUNIT]), [ISPAREPART] = ?",
+				"FROM [EXPLMARG_QLT].[TPIECES_TMP] [P]",
+				"WHERE [P].[CBUSINESS] = N'ACRI'",
+				"-- 1: true"));
+
+		update = updateTmp(ORACLE);
+		update.set("DPTYPE", "UPPER(P.DPTYPE)");
+		update.getWhere().value("P.CBUSINESS", EQ, "ACRI");
+		sql("Oracle", update, lines(
+				"UPDATE \"EXPLMARG_QLT\".\"TPIECES_TMP\" \"P\"",
+				"SET \"DPTYPE\" = UPPER(\"P\".\"DPTYPE\")",
+				"WHERE \"P\".\"CBUSINESS\" = N'ACRI'"));
+	}
+
+	/**
+	 * Checks the validations of updates that need no database.
+	 */
+	private static void updateErrors() {
+		section("UPDATE: errors");
+		error("Table set twice", IllegalStateException.class, () -> updateTmp(SQLSERVER).table(pieces, "X"));
+		error("Null alias", NullPointerException.class, () -> new QUpdate(SQLSERVER).table(piecesTmp, null));
+		error("SET before the table", IllegalStateException.class,
+				() -> new QUpdate(SQLSERVER).set("DPTYPE", new Value("X")));
+		error("Unknown column name", IllegalArgumentException.class, () -> updateTmp(SQLSERVER).set("XXX", new Value("X")));
+		error("Column of another table", IllegalArgumentException.class,
+				() -> updateTmp(SQLSERVER).set(pieces.columns().get("DPTYPE"), new Value("X")));
+		error("Column repeated, ignoring case", IllegalArgumentException.class, () -> {
+			QUpdate u = updateTmp(SQLSERVER);
+			u.set("DPTYPE", "P.DPTYPE_ES");
+			u.set("dptype", new Value("X"));
+		});
+		error("Aggregate in SET", SyntaxException.class, () -> updateTmp(SQLSERVER).set("DPTYPE", "MAX(P.DPTYPE)"));
+		error("Placeholder in SET", SyntaxException.class, () -> updateTmp(SQLSERVER).set("DPTYPE", "?"));
+		error("Column of an unknown alias in SET", SyntaxException.class,
+				() -> updateTmp(SQLSERVER).set("DPTYPE", "X.DPTYPE"));
+		error("Execute without table", IllegalStateException.class, () -> new QUpdate(SQLSERVER).execute());
+		error("Execute without SET", IllegalStateException.class, () -> updateTmp(SQLSERVER).execute());
+
+		Column tmpType = piecesTmp.columns().get("CPTYPE");
+		Column tmpDesc = piecesTmp.columns().get("DPTYPE");
+		error("Record on an update built by hand", IllegalStateException.class,
+				() -> updateTmp(SQLSERVER).execute(record(list(tmpType, tmpDesc))));
+		error("Columns of two tables", IllegalArgumentException.class,
+				() -> new QUpdate(SQLSERVER).execute(record(list(tmpType, pieces.columns().get("DPTYPE")))));
+		error("Without the primary key column", IllegalArgumentException.class,
+				() -> new QUpdate(SQLSERVER).execute(record(list(tmpDesc))));
+		error("Only the primary key column", IllegalArgumentException.class,
+				() -> new QUpdate(SQLSERVER).execute(record(list(tmpType))));
+		ColumnList repeated = new ColumnList();
+		repeated.add("CPTYPE", tmpType);
+		repeated.add("DPTYPE", tmpDesc);
+		repeated.add("DESC_AGAIN", tmpDesc);
+		error("A column repeated under two aliases", IllegalArgumentException.class,
+				() -> new QUpdate(SQLSERVER).execute(record(repeated)));
+		Table noKey = new Table("NOKEY");
+		noKey.columns().add(new Column("CCODE", Types.STRING, 10, -1));
+		error("A table without primary key", IllegalArgumentException.class,
+				() -> new QUpdate(SQLSERVER).execute(record(list(noKey.columns().get("CCODE")))));
+	}
+
+	/**
+	 * Runs the updates on the local SQL Server, on TPIECES_TMP filled by the
+	 * inserts.
+	 *
+	 * @param own The records of TPIECES_TMP, read with its columns.
+	 * @throws SQLException If a database access error occurs.
+	 */
+	private static void updateRuns(List<Record> own) throws SQLException {
+		section("UPDATE: runs on SQL Server");
+		ColumnList columns = own.get(0).columns();
+		int descPosition = columns.indexOf("DPTYPE");
+		QUpdate recordUpdate = new QUpdate(SQLSERVER);
+		int updated = 0;
+		for (int i = 0; i < 10; i++) {
+			Value[] values = values(own.get(i));
+			StringBuilder desc = new StringBuilder();
+			desc.append("UPD-");
+			desc.append(i);
+			values[descPosition] = new Value(desc.toString());
+			updated += recordUpdate.execute(new Record(columns, values));
+		}
+		Value[] missing = values(own.get(0));
+		missing[columns.indexOf("CPTYPE")] = new Value("ZZ_MISSING");
+		int none = recordUpdate.execute(new Record(columns, missing));
+		String changed = queryOne("SELECT COUNT(*) FROM EXPLMARG_QLT.TPIECES_TMP WHERE DPTYPE LIKE 'UPD-%'");
+		StringBuilder recordResult = new StringBuilder();
+		recordResult.append(updated);
+		recordResult.append(" updated, ");
+		recordResult.append(none);
+		recordResult.append(" for a missing key, ");
+		recordResult.append(changed);
+		recordResult.append(" rows changed");
+		equal("Ten records by key with one update, and a missing key", recordResult.toString(),
+				"10 updated, 0 for a missing key, 10 rows changed");
+		String recordSQL = recordUpdate.toString();
+		report(recordSQL.startsWith("UPDATE [EXPLMARG_QLT].[TPIECES_TMP]\nSET [DPTYPE] = ?, ")
+				&& recordSQL.contains("\nWHERE [CPTYPE] = ?\n-- 1: "), "SQL of the records: the non-key columns, then the key",
+				recordSQL, "SET of the 9 other columns, WHERE CPTYPE");
+		ColumnList other = list(piecesTmp.columns().columns().toArray(new Column[0]));
+		error("A record with another column list", IllegalArgumentException.class,
+				() -> recordUpdate.execute(new Record(other, values(own.get(20)))));
+		error("Conditions on an update used with records", IllegalStateException.class, () -> recordUpdate.getWhere());
+		error("SET on an update used with records", IllegalStateException.class,
+				() -> recordUpdate.set("DPTYPE", new Value("X")));
+		error("Execute by hand on an update used with records", IllegalStateException.class, () -> recordUpdate.execute());
+
+		String business = queryOne("SELECT MIN(CBUSINESS) FROM EXPLMARG_QLT.TPIECES_TMP");
+		StringBuilder countBusiness = new StringBuilder();
+		countBusiness.append("SELECT COUNT(*) FROM EXPLMARG_QLT.TPIECES_TMP WHERE CBUSINESS = '");
+		countBusiness.append(business);
+		countBusiness.append("'");
+		String expected = queryOne(countBusiness.toString());
+		QUpdate byBusiness = updateTmp(SQLSERVER);
+		byBusiness.set("DPTYPE", "'X-' || P.CPTYPE");
+		byBusiness.set("ISPAREPART", new Value(true));
+		byBusiness.getWhere().value("P.CBUSINESS", EQ, business);
+		int rows = byBusiness.execute();
+		StringBuilder countDone = new StringBuilder();
+		countDone.append(countBusiness);
+		countDone.append(" AND DPTYPE = 'X-' + CPTYPE AND ISPAREPART = 'Y'");
+		String done = queryOne(countDone.toString());
+		StringBuilder businessResult = new StringBuilder();
+		businessResult.append(rows);
+		businessResult.append(" updated, ");
+		businessResult.append(done);
+		businessResult.append(" with the new values");
+		StringBuilder businessExpected = new StringBuilder();
+		businessExpected.append(expected);
+		businessExpected.append(" updated, ");
+		businessExpected.append(expected);
+		businessExpected.append(" with the new values");
+		equal("An expression and a value, WHERE with a value", businessResult.toString(), businessExpected.toString());
+
+		expected = queryOne(lines(
+				"SELECT COUNT(*) FROM EXPLMARG_QLT.TPIECES_TMP P",
+				"WHERE EXISTS (SELECT 1 FROM EXPLMARG_QLT.TPIECES X WHERE X.CPTYPE = P.CPTYPE AND X.CUNIT = 'UND')"));
+		QUpdate byExists = updateTmp(SQLSERVER);
+		byExists.set("CUNIT", new Value("UNX"));
+		QWhere where = byExists.getWhere();
+		QSelect exists = where.createExists();
+		exists.from(pieces, "X");
+		exists.addColumn("1", "NREF");
+		QWhere existsWhere = exists.getWhere();
+		existsWhere.expr("X.CPTYPE", EQ, "P.CPTYPE");
+		existsWhere.value(AND, "X.CUNIT", EQ, "UND");
+		where.exists(exists);
+		rows = byExists.execute();
+		equal("WHERE EXISTS on another table", String.valueOf(rows), expected);
 	}
 
 	/**
@@ -682,6 +859,8 @@ public class TestQDML {
 		statements();
 		errors();
 		recordErrors();
+		updateStatements();
+		updateErrors();
 		deleteStatements();
 		deleteErrors();
 		if (db) {

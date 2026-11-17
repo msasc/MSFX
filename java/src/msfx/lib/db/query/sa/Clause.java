@@ -34,5 +34,7 @@ public enum Clause {
 	/** The HAVING condition: aggregates of the select list, and no column outside them. */
 	HAVING,
 	/** A value of an INSERT: a value without tables, so without columns, nor aggregates. */
-	VALUES
+	VALUES,
+	/** A value of the SET list of an UPDATE: a value on the table updated, without aggregates. */
+	SET
 }
