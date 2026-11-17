@@ -9,6 +9,10 @@ java/lib/javafx/
 # CMA metadata of a client application, kept local (input of CatalogCMAGenerator)
 java/res/cma/
 
+# --- Claude Code ---------------------------------------------------
+# Personal settings of this project, such as permissions
+.claude/settings.local.json
+
 # --- Windows -------------------------------------------------------
 Thumbs.db
 desktop.ini

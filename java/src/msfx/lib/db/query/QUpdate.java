@@ -33,6 +33,10 @@ public class QUpdate extends QBase {
 	 */
 	private final QFrom from;
 	/**
+	 * Tables used, by alias.
+	 */
+	private final QScope scope;
+	/**
 	 * WHERE conditions.
 	 */
 	private final QWhere where;
@@ -47,7 +51,8 @@ public class QUpdate extends QBase {
 	public QUpdate(DBEngine db, Table table) {
 		super(db);
 		from = new QFrom(db, table, null);
-		where = new QWhere(db);
+		scope = new QScope(null);
+		where = new QWhere(db, scope);
 	}
 
 	/**

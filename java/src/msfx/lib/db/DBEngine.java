@@ -20,8 +20,10 @@ import msfx.lib.db.pool.ConnectionPool;
 import msfx.lib.db.query.sa.Function;
 import msfx.lib.md.Catalog;
 import msfx.lib.md.Column;
+import msfx.lib.md.DataType;
 import msfx.lib.md.Types;
 import msfx.lib.md.Value;
+import msfx.lib.util.Numbers;
 import msfx.lib.util.Properties;
 
 import java.math.BigDecimal;
@@ -278,6 +280,109 @@ public abstract class DBEngine {
 	 */
 	public DBConnection getConnection() throws SQLException {
 		return pool.getConnection();
+	}
+
+	/**
+	 * Sets a parameter of a prepared statement with the setter of the type of
+	 * the value, or to NULL of that type for a null value. Used by the query
+	 * classes and by any SQL written by hand with placeholders.
+	 *
+	 * @param ps    The prepared statement.
+	 * @param index The parameter index, starting at 1.
+	 * @param value The value.
+	 * @throws SQLException If a database access error occurs.
+	 */
+	public final void setValue(DBPreparedStatement ps, int index, Value value) throws SQLException {
+		if (value.isNull()) {
+			ps.setNull(index, value.getType());
+			return;
+		}
+		switch (value.getType()) {
+			case BOOLEAN:
+				ps.setBoolean(index, value.getBoolean());
+				break;
+			case DECIMAL:
+				ps.setDecimal(index, value.getDecimal());
+				break;
+			case DOUBLE:
+				ps.setDouble(index, value.getDouble());
+				break;
+			case INTEGER:
+				ps.setInteger(index, value.getInteger());
+				break;
+			case LONG:
+				ps.setLong(index, value.getLong());
+				break;
+			case DATE:
+				ps.setDate(index, value.getDate());
+				break;
+			case TIME:
+				ps.setTime(index, value.getTime());
+				break;
+			case DATETIME:
+				ps.setDateTime(index, value.getDateTime());
+				break;
+			case STRING:
+				ps.setString(index, value.getString());
+				break;
+			case BINARY:
+				ps.setBinary(index, value.getBinary());
+				break;
+			case OBJECT:
+				ps.setObject(index, value.getObject());
+				break;
+		}
+	}
+
+	/**
+	 * Reads a column of the current row of a result set as a value of a data
+	 * type, with the getter of the type, the driver converting the type of the
+	 * database. The value is not modified:
+	 * <ul>
+	 * <li>DECIMAL values get the decimals of the data type, rounded half up.</li>
+	 * <li>Null numbers and booleans are zero and false, null strings are
+	 * empty.</li>
+	 * <li>Booleans are read from 1/0, Y/N or T/F, and objects parsed from their
+	 * JSON text.</li>
+	 * </ul>
+	 * Used by the query classes and by any SQL written by hand. Each column is
+	 * read once, streamed columns can not be read again.
+	 *
+	 * @param rs       The result set, positioned on the row.
+	 * @param index    The column index, starting at 1.
+	 * @param dataType The data type of the value.
+	 * @return The value.
+	 * @throws SQLException If a database access error occurs, or an object is
+	 *                      not valid JSON.
+	 */
+	public final Value getValue(DBResultSet rs, int index, DataType dataType) throws SQLException {
+		Value value = switch (dataType.type()) {
+			case BOOLEAN:
+				yield new Value(rs.getBoolean(index));
+			case DECIMAL:
+				yield new Value(Numbers.toScale(rs.getDecimal(index), dataType.decimals()));
+			case DOUBLE:
+				yield new Value(rs.getDouble(index));
+			case INTEGER:
+				yield new Value(rs.getInteger(index));
+			case LONG:
+				yield new Value(rs.getLong(index));
+			case DATE:
+				yield new Value(rs.getDate(index));
+			case TIME:
+				yield new Value(rs.getTime(index));
+			case DATETIME:
+				yield new Value(rs.getDateTime(index));
+			case STRING: {
+				String string = rs.getString(index);
+				yield new Value(string != null ? string : "");
+			}
+			case BINARY:
+				yield new Value(rs.getBinary(index));
+			case OBJECT:
+				yield new Value(rs.getObject(index));
+		};
+		return value;
 	}
 
 	/**

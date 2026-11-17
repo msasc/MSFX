@@ -16,6 +16,9 @@
 
 package test.claude.sa;
 
+import static test.claude.Check.*;
+import static test.claude.Fixture.*;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,34 +30,27 @@ import msfx.lib.db.query.sa.Node;
 import msfx.lib.db.query.sa.Parser;
 import msfx.lib.db.query.sa.SyntaxException;
 import msfx.lib.db.query.sa.Validator;
-import msfx.lib.md.Column;
 import msfx.lib.md.Table;
-import msfx.lib.md.Types;
 import msfx.lib.md.Value;
+import test.claude.Check;
 
 /**
- * Tests the {@link Validator}: the columns resolved in valid expressions, and
- * the position of the errors in invalid ones, for each clause.
+ * Tests the {@link Validator} on the CMA tables WC_SALES S and ARTICLES A: the
+ * columns resolved in valid expressions, and the position of the errors in
+ * invalid ones, for each clause.
  *
  * @author Miquel Sas
  */
 public class TestValidator {
 
 	/**
-	 * Number of checks that failed.
-	 */
-	private static int failed = 0;
-	/**
-	 * Number of checks that passed.
-	 */
-	private static int passed = 0;
-	/**
 	 * The validated select list, for HAVING.
 	 */
 	private static List<Analysis> selectList = List.of();
 
 	/**
-	 * Returns the scope of the tables, by alias, ignoring case as QSelect does.
+	 * Returns the scope of the tables, by alias, ignoring case as the
+	 * statements do.
 	 *
 	 * @param entries Pairs of alias and table.
 	 * @return The scope.
@@ -79,7 +75,9 @@ public class TestValidator {
 	private static Analysis analyze(Clause clause, Map<String, Table> tables, String expression, Value... values) {
 		Parser parser = new Parser(expression);
 		Node root = (clause == Clause.SELECT ? parser.parseExpression() : parser.parseCondition());
-		return new Validator(expression, root, clause, tables, List.of(values), selectList).validate();
+		Validator validator = new Validator(expression, root, clause, tables, List.of(values), selectList);
+		Analysis analysis = validator.validate();
+		return analysis;
 	}
 
 	/**
@@ -115,6 +113,26 @@ public class TestValidator {
 	}
 
 	/**
+	 * Returns the title of a check: the clause and the expression, shortened.
+	 *
+	 * @param clause     The clause.
+	 * @param expression The expression.
+	 * @return The title.
+	 */
+	private static String title(Clause clause, String expression) {
+		StringBuilder b = new StringBuilder();
+		b.append(clause);
+		b.append(" ");
+		if (expression.length() > 70) {
+			b.append(expression, 0, 70);
+			b.append("...");
+		} else {
+			b.append(expression);
+		}
+		return b.toString();
+	}
+
+	/**
 	 * Validates an expression that must be accepted, and compares the columns
 	 * resolved.
 	 *
@@ -134,7 +152,7 @@ public class TestValidator {
 			b.append(exc.getMessage().lines().findFirst().orElse(""));
 			result = b.toString();
 		}
-		report(expected.equals(result), clause, expression, result, expected);
+		equal(title(clause, expression), result, expected);
 	}
 
 	/**
@@ -160,67 +178,20 @@ public class TestValidator {
 			result = b.toString();
 			ok = exc.getPosition() == position;
 		}
-		report(ok, clause, expression, result, String.valueOf(position));
+		report(ok, title(clause, expression), result, String.valueOf(position));
 	}
 
 	/**
-	 * Prints the result of a check and counts it.
-	 *
-	 * @param ok         Whether the check passed.
-	 * @param clause     The clause.
-	 * @param expression The expression.
-	 * @param result     The result.
-	 * @param expected   The expected result.
+	 * Runs the checks.
 	 */
-	private static void report(boolean ok, Clause clause, String expression, String result, String expected) {
-		if (ok) {
-			passed++;
-		} else {
-			failed++;
-		}
-		StringBuilder line = new StringBuilder();
-		line.append(ok ? "   ok    " : "   FAIL  ");
-		line.append(clause);
-		line.append(" ");
-		if (expression.length() > 70) {
-			line.append(expression, 0, 70);
-			line.append("...");
-		} else {
-			line.append(expression);
-		}
-		line.append("  ->  ");
-		line.append(result);
-		if (!ok) {
-			line.append("\n         expected: ");
-			line.append(expected);
-		}
-		System.out.println(line);
-	}
-
-	/**
-	 * Entry point.
-	 *
-	 * @param args Not used.
-	 */
-	public static void main(String[] args) {
-
-		Table sales = new Table("SALES");
-		sales.columns().add(new Column("CCOMPANY", Types.STRING, 10, -1));
-		sales.columns().add(new Column("CARTICLE", Types.STRING, 40, -1));
-		sales.columns().add(new Column("NYEAR", Types.INTEGER, -1, -1));
-		sales.columns().add(new Column("QSALES", Types.DECIMAL, 16, 2));
-		sales.columns().add(new Column("QCOST", Types.DECIMAL, 16, 2));
-		sales.columns().add(new Column("DSALE", Types.DATE, -1, -1));
-
-		Table articles = new Table("ARTICLES");
-		articles.columns().add(new Column("CARTICLE", Types.STRING, 40, -1));
-		articles.columns().add(new Column("CBUSINESS", Types.STRING, 12, -1));
-		articles.columns().add(new Column("CPTYPE", Types.STRING, 40, -1));
-
+	public static void run() {
+		Check.start("TestValidator");
+		Table sales = table("WC_SALES");
+		Table articles = table("ARTICLES");
 		Map<String, Table> one = scope("S", sales);
 		Map<String, Table> two = scope("S", sales, "A", articles);
 
-		System.out.println("== ON");
+		section("ON");
 		ok(Clause.ON, two, "S.CARTICLE = A.CARTICLE", "S.CARTICLE, A.CARTICLE");
 		ok(Clause.ON, two, "s.carticle = a.Carticle", "S.CARTICLE, A.CARTICLE");
 		error(Clause.ON, two, "S.CARTICLE = X.CARTICLE", 13);
@@ -229,9 +200,9 @@ public class TestValidator {
 		error(Clause.ON, one, "S.CARTICLE = A.CARTICLE", 13);
 		error(Clause.ON, two, "SUM(S.QSALES) > 0", 0);
 
-		System.out.println("== WHERE");
+		section("WHERE");
 		ok(Clause.WHERE, one, "CCOMPANY = ? AND NYEAR = ?", "S.CCOMPANY, S.NYEAR", new Value("LCZ"), new Value(2026));
-		ok(Clause.WHERE, two, "A.CBUSINESS IN ('ACRI', 'BACE') AND S.DSALE IS NOT NULL", "A.CBUSINESS, S.DSALE");
+		ok(Clause.WHERE, two, "A.CBUSINESS IN ('ACRI', 'BACE') AND A.TOBSOLETE IS NOT NULL", "A.CBUSINESS, A.TOBSOLETE");
 		ok(Clause.WHERE, one, "1 = 1", "no columns");
 		error(Clause.WHERE, one, "CCOMPANY = ?", 11);
 		error(Clause.WHERE, one, "CCOMPANY = ?", 12, new Value("LCZ"), new Value("XXX"));
@@ -282,46 +253,43 @@ public class TestValidator {
 			}
 		}
 
-		System.out.println("== SELECT");
+		section("SELECT");
 		ok(Clause.SELECT, one, "SUM(QSALES)", "S.QSALES");
 		ok(Clause.SELECT, one, "(SUM(QSALES * 2))", "S.QSALES");
 		ok(Clause.SELECT, one, "CCOMPANY || '-' || CARTICLE", "S.CCOMPANY, S.CARTICLE");
 		error(Clause.SELECT, one, "SUM(QSALES) / 100", 0);
 		error(Clause.SELECT, one, "ROUND(SUM(QSALES), 2)", 6);
-		error(Clause.SELECT, one, "SUM(QSALES) + SUM(QCOST)", 0);
+		error(Clause.SELECT, one, "SUM(QSALES) + SUM(MCOST)", 0);
 		error(Clause.SELECT, one, "SUM(COUNT(*))", 4);
 
-		System.out.println("== HAVING");
+		section("HAVING");
 		List<Analysis> list = new ArrayList<>();
 		list.add(analyze(Clause.SELECT, one, "CCOMPANY"));
 		list.add(analyze(Clause.SELECT, one, "SUM(QSALES)"));
 		list.add(analyze(Clause.SELECT, one, "COUNT(*)"));
-		list.add(analyze(Clause.SELECT, one, "SUM(S.QCOST)"));
+		list.add(analyze(Clause.SELECT, one, "SUM(S.MCOST)"));
 		list.add(analyze(Clause.SELECT, one, "COUNT(DISTINCT CARTICLE)"));
 		selectList = list;
 		ok(Clause.HAVING, one, "SUM(QSALES) > 0 AND COUNT(*) > 100", "S.QSALES");
-		ok(Clause.HAVING, one, "sum(s.qsales) - SUM(QCOST) > 0", "S.QSALES, S.QCOST");
-		ok(Clause.HAVING, one, "SUM(QSALES) * 2 > SUM((QCOST))", "S.QSALES, S.QCOST");
+		ok(Clause.HAVING, one, "sum(s.qsales) - SUM(MCOST) > 0", "S.QSALES, S.MCOST");
+		ok(Clause.HAVING, one, "SUM(QSALES) * 2 > SUM((MCOST))", "S.QSALES, S.MCOST");
 		ok(Clause.HAVING, one, "COUNT(DISTINCT S.CARTICLE) > 5", "S.CARTICLE");
 		ok(Clause.HAVING, one, "SUM(QSALES) BETWEEN 1 AND 10", "S.QSALES");
 		error(Clause.HAVING, one, "CCOMPANY = 'LCZ' AND SUM(QSALES) > 0", 0);
-		error(Clause.HAVING, one, "SUM(QCOST * 2) > 0", 0);
+		error(Clause.HAVING, one, "SUM(MCOST * 2) > 0", 0);
 		error(Clause.HAVING, one, "COUNT(CARTICLE) > 5", 0);
 		error(Clause.HAVING, one, "ROUND(SUM(QSALES), 2) > 0", 6);
 		error(Clause.HAVING, one, "AVG(QSALES) > 0", 0);
+		selectList = List.of();
+	}
 
-		System.out.println("== Message");
-		try {
-			analyze(Clause.HAVING, one, "SUM(QSALES) > 0 AND CCOMPANY = 'LCZ'");
-		} catch (SyntaxException exc) {
-			System.out.println(exc.getMessage());
-		}
-
-		StringBuilder summary = new StringBuilder();
-		summary.append("Passed: ");
-		summary.append(passed);
-		summary.append(", failed: ");
-		summary.append(failed);
-		System.out.println(summary);
+	/**
+	 * Entry point.
+	 *
+	 * @param args Not used.
+	 */
+	public static void main(String[] args) {
+		run();
+		summary();
 	}
 }

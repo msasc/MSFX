@@ -16,12 +16,15 @@
 
 package test.claude.util;
 
+import static test.claude.Check.*;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import msfx.lib.util.function.Consumer;
 import msfx.lib.util.function.Function;
+import test.claude.Check;
 
 /**
  * Tests {@link Consumer} and {@link Function}: the exception type parameter is
@@ -33,41 +36,6 @@ import msfx.lib.util.function.Function;
  * @author Miquel Sas
  */
 public class TestFunctions {
-
-	/**
-	 * Number of checks that failed.
-	 */
-	private static int failed = 0;
-	/**
-	 * Number of checks that passed.
-	 */
-	private static int passed = 0;
-
-	/**
-	 * Prints the result of a check and counts it.
-	 *
-	 * @param ok       Whether the check passed.
-	 * @param title    What is checked.
-	 * @param result   The result.
-	 * @param expected The expected result.
-	 */
-	private static void report(boolean ok, String title, String result, String expected) {
-		if (ok) {
-			passed++;
-		} else {
-			failed++;
-		}
-		StringBuilder line = new StringBuilder();
-		line.append(ok ? "   ok    " : "   FAIL  ");
-		line.append(title);
-		line.append("\n");
-		line.append(result.indent(9));
-		if (!ok) {
-			line.append("         expected:\n");
-			line.append(expected.indent(9));
-		}
-		System.out.print(line);
-	}
 
 	/**
 	 * Calls a consumer for each item, as a reader would for each record.
@@ -117,15 +85,14 @@ public class TestFunctions {
 	}
 
 	/**
-	 * Entry point.
-	 *
-	 * @param args Not used.
+	 * Runs the checks.
 	 */
-	public static void main(String[] args) {
+	public static void run() {
+		Check.start("TestFunctions");
 
 		List<String> items = List.of("LCZ", "RSA", "ABCD");
 
-		System.out.println("== Without checked exceptions: no try block");
+		section("Without checked exceptions: no try block");
 		StringBuilder visited = new StringBuilder();
 		forEach(items, (index, item) -> {
 			visited.append(index);
@@ -141,7 +108,7 @@ public class TestFunctions {
 		String total = String.valueOf(sum.call(1, 2, 3, 4, 5, 6));
 		report(total.equals("21"), "Function.P6 in a variable, E given as RuntimeException", total, "21");
 
-		System.out.println("== With a checked exception: inferred and caught");
+		section("With a checked exception: inferred and caught");
 		String result;
 		try {
 			result = map(items, item -> lengthOf(item)).toString();
@@ -167,12 +134,15 @@ public class TestFunctions {
 			result = exc.getMessage();
 		}
 		report(result.equals("Failed"), "Consumer.P0 in a variable, E given as IOException", result, "Failed");
+	}
 
-		StringBuilder summary = new StringBuilder();
-		summary.append("Passed: ");
-		summary.append(passed);
-		summary.append(", failed: ");
-		summary.append(failed);
-		System.out.println(summary);
+	/**
+	 * Entry point.
+	 *
+	 * @param args Not used.
+	 */
+	public static void main(String[] args) {
+		run();
+		summary();
 	}
 }

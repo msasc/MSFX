@@ -16,49 +16,28 @@
 
 package test.claude.query;
 
-import java.sql.SQLException;
+import static test.claude.Check.*;
+import static test.claude.Fixture.*;
 
-import msfx.lib.db.DBConnection;
 import msfx.lib.db.DBEngine;
-import msfx.lib.db.DBResultSet;
-import msfx.lib.db.DBStatement;
-import msfx.lib.db.adapters.DBEngineOracle;
-import msfx.lib.db.adapters.DBEngineSQLServer;
 import msfx.lib.db.query.Logical;
 import msfx.lib.db.query.QSelect;
+import msfx.lib.db.query.QWhere;
 import msfx.lib.db.query.sa.SyntaxException;
-import msfx.lib.md.Catalog;
 import msfx.lib.md.Table;
 import msfx.lib.md.Value;
-import test.db.CatalogCMA;
+import test.claude.Check;
 
 /**
  * Tests the FROM clause of {@link QSelect} that wraps the UNION or UNION ALL of
- * other selects, through its toString(), with tables of {@link CatalogCMA}.
- * With "db", the selects are also executed on the local SQL Server, over small
- * master tables, and compared with hand-written queries. Only SELECT statements
- * are executed.
+ * other selects, through its toString(), with CMA tables. With "db", the
+ * selects are also executed on the local SQL Server, over small master tables,
+ * and compared with hand-written queries. Only SELECT statements are executed.
  *
  * @author Miquel Sas
  */
 public class TestQSelectUnion {
 
-	/**
-	 * SQL Server engine.
-	 */
-	private static final DBEngineSQLServer SQLSERVER = new DBEngineSQLServer();
-	/**
-	 * Oracle engine.
-	 */
-	private static final DBEngine ORACLE = new DBEngineOracle();
-	/**
-	 * Number of checks that failed.
-	 */
-	private static int failed = 0;
-	/**
-	 * Number of checks that passed.
-	 */
-	private static int passed = 0;
 	/**
 	 * The table BRANDS.
 	 */
@@ -76,86 +55,6 @@ public class TestQSelectUnion {
 	 */
 	private static Table divisions;
 
-	/**
-	 * Prints the result of a check and counts it.
-	 *
-	 * @param ok       Whether the check passed.
-	 * @param title    What is checked.
-	 * @param result   The result.
-	 * @param expected The expected result.
-	 */
-	private static void report(boolean ok, String title, String result, String expected) {
-		if (ok) {
-			passed++;
-		} else {
-			failed++;
-		}
-		StringBuilder line = new StringBuilder();
-		line.append(ok ? "   ok    " : "   FAIL  ");
-		line.append(title);
-		line.append("\n");
-		line.append(result.indent(9));
-		if (!ok) {
-			line.append("         expected:\n");
-			line.append(expected.indent(9));
-		}
-		System.out.print(line);
-	}
-
-	/**
-	 * Joins lines with new lines, as the select writes its clauses.
-	 *
-	 * @param lines The lines.
-	 * @return The text.
-	 */
-	private static String lines(String... lines) {
-		StringBuilder b = new StringBuilder();
-		for (int i = 0; i < lines.length; i++) {
-			if (i > 0) {
-				b.append("\n");
-			}
-			b.append(lines[i]);
-		}
-		return b.toString();
-	}
-
-	/**
-	 * Compares the SQL of a select with the expected one.
-	 *
-	 * @param title    What is checked.
-	 * @param select   The select.
-	 * @param expected The expected SQL.
-	 */
-	private static void sql(String title, QSelect select, String expected) {
-		String result = select.toString();
-		report(expected.equals(result), title, result, expected);
-	}
-
-	/**
-	 * Runs an action that must fail with an exception of the expected class,
-	 * and prints its message.
-	 *
-	 * @param title    What is checked.
-	 * @param expected The expected class of exception.
-	 * @param action   The action.
-	 */
-	private static void error(String title, Class<? extends Exception> expected, Runnable action) {
-		String result;
-		boolean ok;
-		try {
-			action.run();
-			result = "no error";
-			ok = false;
-		} catch (Exception exc) {
-			StringBuilder b = new StringBuilder();
-			b.append(exc.getClass().getSimpleName());
-			b.append(": ");
-			b.append(exc.getMessage());
-			result = b.toString();
-			ok = expected.isInstance(exc);
-		}
-		report(ok, title, result, expected.getSimpleName());
-	}
 
 	/**
 	 * Returns a select of a kind literal and the company of a table.
@@ -200,73 +99,25 @@ public class TestQSelectUnion {
 	}
 
 	/**
-	 * Reads the rows of an SQL query as text, one row per line, columns
-	 * separated by spaces.
+	 * Runs the checks.
 	 *
-	 * @param sql The query.
-	 * @return The rows, or the error message.
+	 * @param db True to also run the selects on the local SQL Server.
 	 */
-	private static String rows(String sql) {
-		StringBuilder result = new StringBuilder();
-		try (DBConnection cn = SQLSERVER.getConnection();
-				DBStatement st = cn.createStatement();
-				DBResultSet rs = st.executeQuery(sql)) {
-			int count = rs.getMetaData().getColumnCount();
-			while (rs.next()) {
-				for (int i = 1; i <= count; i++) {
-					if (i > 1) {
-						result.append(" ");
-					}
-					result.append(rs.getString(i));
-				}
-				result.append("\n");
-			}
-		} catch (SQLException exc) {
-			result.append(exc.getMessage());
-		}
-		return result.toString();
-	}
+	public static void run(boolean db) {
+		Check.start("TestQSelectUnion");
+		brands = table("BRANDS");
+		companies = table("COMPANIES");
+		businesses = table("BUSINESSES");
+		divisions = table("DIVISIONS");
 
-	/**
-	 * Runs a select and a hand-written query on SQL Server and compares their
-	 * rows.
-	 *
-	 * @param title    What is checked.
-	 * @param select   The select.
-	 * @param expected The hand-written query.
-	 */
-	private static void run(String title, QSelect select, String expected) {
-		String result = rows(select.toString());
-		String expectedRows = rows(expected);
-		StringBuilder shown = new StringBuilder();
-		shown.append(result.lines().count());
-		shown.append(" rows");
-		boolean ok = !result.isEmpty() && result.equals(expectedRows);
-		report(ok, title, ok ? shown.toString() : result, expectedRows);
-	}
-
-	/**
-	 * Entry point.
-	 *
-	 * @param args Pass "db" to also run the selects on the local SQL Server.
-	 */
-	public static void main(String[] args) {
-
-		Catalog catalog = new Catalog();
-		catalog.addProvider(new CatalogCMA());
-		brands = catalog.getTable(CatalogCMA.SCHEMA, "BRANDS");
-		companies = catalog.getTable(CatalogCMA.SCHEMA, "COMPANIES");
-		businesses = catalog.getTable(CatalogCMA.SCHEMA, "BUSINESSES");
-		divisions = catalog.getTable(CatalogCMA.SCHEMA, "DIVISIONS");
-
-		System.out.println("== UNION ALL and UNION");
+		section("UNION ALL and UNION");
 		QSelect select = new QSelect(SQLSERVER);
 		select.wrapUnionAll("Q",
 				companies(SQLSERVER, brands, "B", "B"),
 				companies(SQLSERVER, companies, "C", "C"));
 		select.addColumn("Q.KIND", "KIND");
 		select.addColumn("COUNT(*)", "NROWS");
-		select.whereCond("Q.CCOMPANY IS NOT NULL");
+		select.getWhere().cond("Q.CCOMPANY IS NOT NULL");
 		select.groupBy();
 		select.orderBy("KIND");
 		QSelect countByKind = select;
@@ -299,13 +150,13 @@ public class TestQSelectUnion {
 				") [Q]",
 				"ORDER BY [CDIVISION]"));
 
-		System.out.println("== Joins after the wrap");
+		section("Joins after the wrap");
 		select = new QSelect(SQLSERVER);
 		select.wrapUnion("Q", divisions(SQLSERVER, businesses, "U"), divisions(SQLSERVER, divisions, "D"));
 		select.leftJoin(divisions, "D", "Q.CDIVISION = D.CDIVISION");
 		select.addColumn("Q.CDIVISION", "CDIVISION");
 		select.addColumn("D.DDIVISION", "DDIVISION");
-		select.whereCond("D.CDIVISION IS NULL");
+		select.getWhere().cond("D.CDIVISION IS NULL");
 		select.orderBy("CDIVISION");
 		QSelect orphanDivisions = select;
 		sql("LEFT JOIN with the alias of an inner table, reused outside", select, lines(
@@ -321,20 +172,21 @@ public class TestQSelectUnion {
 				"WHERE ([D].[CDIVISION] IS NULL OR [D].[CDIVISION] = '')",
 				"ORDER BY [CDIVISION]"));
 
-		System.out.println("== Types of the wrapped columns");
+		section("Types of the wrapped columns");
 		select = new QSelect(SQLSERVER);
 		select.wrapUnionAll("Q",
 				companies(SQLSERVER, brands, "B", "B"),
 				companies(SQLSERVER, companies, "C", "C"));
 		select.addColumn("Q.CCOMPANY", "CCOMPANY");
-		select.whereCond("Q.CCOMPANY IS NULL");
-		select.whereCond(Logical.OR, "Q.KIND IS NULL");
+		QWhere where = select.getWhere();
+		where.cond("Q.CCOMPANY IS NULL");
+		where.cond(Logical.OR, "Q.KIND IS NULL");
 		String result = select.toString();
 		String expected = "WHERE ([Q].[CCOMPANY] IS NULL OR [Q].[CCOMPANY] = '') OR [Q].[KIND] IS NULL";
 		report(result.endsWith(expected), "Plain column: STRING; literal: not known, plain IS NULL",
 				result.substring(result.lastIndexOf("WHERE")), expected);
 
-		System.out.println("== Nested wrap");
+		section("Nested wrap");
 		QSelect inner = new QSelect(SQLSERVER);
 		inner.wrapUnion("I", divisions(SQLSERVER, businesses, "U"), divisions(SQLSERVER, divisions, "D"));
 		inner.addColumn("I.CDIVISION", "CDIVISION");
@@ -380,7 +232,7 @@ public class TestQSelectUnion {
 				"\tFROM \"EXPLMARG_QLT\".\"COMPANIES\" \"C\"",
 				") \"Q\""));
 
-		System.out.println("== Errors");
+		section("Errors");
 		error("FROM already set", IllegalStateException.class, () -> {
 			QSelect s = new QSelect(SQLSERVER);
 			s.from(brands, "B");
@@ -419,7 +271,7 @@ public class TestQSelectUnion {
 		error("Wrapped EXISTS select", IllegalStateException.class, () -> {
 			QSelect s = new QSelect(SQLSERVER);
 			s.from(brands, "B");
-			QSelect e = new QSelect(s);
+			QSelect e = s.getWhere().createExists();
 			e.from(divisions, "D");
 			e.addColumn("D.CDIVISION", "CDIVISION");
 			new QSelect(SQLSERVER).wrapUnion("Q", e);
@@ -450,7 +302,7 @@ public class TestQSelectUnion {
 		error("Wrapping alias used by an outer select", IllegalArgumentException.class, () -> {
 			QSelect s = new QSelect(SQLSERVER);
 			s.from(brands, "Q");
-			QSelect e = new QSelect(s);
+			QSelect e = s.getWhere().createExists();
 			e.wrapUnion("Q", divisions(SQLSERVER, divisions, "D"));
 		});
 		error("Unknown column of the wrap", SyntaxException.class, () -> {
@@ -471,15 +323,15 @@ public class TestQSelectUnion {
 		}
 		report(exprs.equals("accepted"), "Aliases compared ignoring case", exprs, "accepted");
 
-		if (args.length > 0 && args[0].equals("db")) {
-			System.out.println("== Run on SQL Server");
-			SQLSERVER.connectTo("localhost:1433;databaseName=sql_cma_qlt", "sa", "SqlPassword2026!");
-			run("UNION ALL counted by kind", countByKind, lines(
+		if (db) {
+			section("Run on SQL Server");
+			connect();
+			sameRows("UNION ALL counted by kind", countByKind, lines(
 					"SELECT 'B', COUNT(*) FROM EXPLMARG_QLT.BRANDS WHERE CCOMPANY <> ''",
 					"UNION ALL",
 					"SELECT 'C', COUNT(*) FROM EXPLMARG_QLT.COMPANIES WHERE CCOMPANY <> ''",
 					"ORDER BY 1"));
-			run("UNION of divisions", allDivisions, lines(
+			sameRows("UNION of divisions", allDivisions, lines(
 					"SELECT DISTINCT CDIVISION FROM (",
 					"SELECT CDIVISION FROM EXPLMARG_QLT.BUSINESSES",
 					"UNION ALL",
@@ -492,16 +344,21 @@ public class TestQSelectUnion {
 					"ORDER BY 1"));
 			report(orphans.equals(expectedOrphans), "Divisions of businesses not in DIVISIONS",
 					orphans.isEmpty() ? "none" : orphans, expectedOrphans.isEmpty() ? "none" : expectedOrphans);
-			run("Nested wrap with HAVING", nested, lines(
+			sameRows("Nested wrap with HAVING", nested, lines(
 					"SELECT D.CDIVISION, 2 FROM EXPLMARG_QLT.DIVISIONS D",
 					"ORDER BY 1"));
 		}
+	}
 
-		StringBuilder summary = new StringBuilder();
-		summary.append("Passed: ");
-		summary.append(passed);
-		summary.append(", failed: ");
-		summary.append(failed);
-		System.out.println(summary);
+	/**
+	 * Entry point.
+	 *
+	 * @param args Pass "db" to also run the selects on the local SQL Server.
+	 */
+	public static void main(String[] args) {
+		boolean db = args.length > 0 && args[0].equals("db");
+		run(db);
+		summary();
+		System.exit(0);
 	}
 }

@@ -371,63 +371,13 @@ public class QInsert extends QBase {
 			return executeUpdate(sql);
 		}
 		String sql = toSQL();
-		try (DBConnection cn = getDBEngine().getConnection();
+		DBEngine db = getDBEngine();
+		try (DBConnection cn = db.getConnection();
 				DBPreparedStatement ps = cn.prepareStatement(sql)) {
 			for (int i = 0; i < values.size(); i++) {
-				setValue(ps, i + 1, values.get(i));
+				db.setValue(ps, i + 1, values.get(i));
 			}
 			return ps.executeUpdate();
-		}
-	}
-
-	/**
-	 * Sets a parameter of the prepared statement with the setter of the type of
-	 * the value.
-	 *
-	 * @param ps    The prepared statement.
-	 * @param index The parameter index, starting at 1.
-	 * @param value The value.
-	 * @throws SQLException If a database access error occurs.
-	 */
-	private static void setValue(DBPreparedStatement ps, int index, Value value) throws SQLException {
-		if (value.isNull()) {
-			ps.setNull(index, value.getType());
-			return;
-		}
-		switch (value.getType()) {
-			case BOOLEAN:
-				ps.setBoolean(index, value.getBoolean());
-				break;
-			case DECIMAL:
-				ps.setDecimal(index, value.getDecimal());
-				break;
-			case DOUBLE:
-				ps.setDouble(index, value.getDouble());
-				break;
-			case INTEGER:
-				ps.setInteger(index, value.getInteger());
-				break;
-			case LONG:
-				ps.setLong(index, value.getLong());
-				break;
-			case DATE:
-				ps.setDate(index, value.getDate());
-				break;
-			case TIME:
-				ps.setTime(index, value.getTime());
-				break;
-			case DATETIME:
-				ps.setDateTime(index, value.getDateTime());
-				break;
-			case STRING:
-				ps.setString(index, value.getString());
-				break;
-			case BINARY:
-				ps.setBinary(index, value.getBinary());
-				break;
-			case OBJECT:
-				ps.setObject(index, value.getObject());
-				break;
 		}
 	}
 
