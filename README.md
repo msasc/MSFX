@@ -23,7 +23,9 @@ Describes the data of the application independently of any database:
   other sources.
 
 A table can be defined by the application or read from an existing database,
-and both are handled the same way.
+and both are handled the same way. Metadata is compared by value, by its
+database structure only, so that the same table read by two parts of the
+application, or sent between them, is recognized as the same.
 
 ### Database access (`msfx.lib.db`)
 
@@ -31,23 +33,25 @@ and both are handled the same way.
 - Adapters for **SQL Server** and **Oracle**. Every difference between
   databases lives in the adapter, and adding a database makes the compiler
   point at every place it must handle.
+- Values written to and read from the database by their type, also for SQL
+  written by hand: booleans as Y/N, JSON objects as text, decimals with the
+  decimals of their column.
 
 ### Query generator (`msfx.lib.db.query`)
 
 Generates SQL from the metadata, one class per statement, so that the same code
-works on every supported database:
+works on every supported database. Hand-written expressions are validated by a
+small SQL analyzer (`db.query.sa`) against the tables involved, and translated
+to each database: names, functions, concatenations and literals.
 
-- **DDL**, complete: create and drop tables, columns, primary keys, indexes
-  and schemas.
-- **SELECT**, in progress: the FROM clause is done; joins, conditions and the
-  select list will rely on a small SQL analyzer (`db.query.sa`) that validates
-  hand-written expressions against the tables involved and translates them to
-  each database. The analyzer is complete: the vocabulary of keywords,
-  operators and functions, the lexer, the parser, the validator of tables,
-  columns and aggregates by clause, and the writer, that quotes names and
-  translates functions, concatenations and literals for each database. Its use
-  in joins, conditions and the select list comes next.
-- **INSERT, UPDATE and DELETE**: to come, with transactions that group them.
+- **DDL**: create and drop tables, columns, primary keys, indexes and schemas.
+- **SELECT**: joins, the select list, WHERE conditions in groups with values,
+  IN and EXISTS, GROUP BY generated from the select list, HAVING, ORDER BY,
+  and the UNION of selects wrapped as a table. Rows are read as records, all
+  at once or one by one.
+- **INSERT, UPDATE and DELETE**: built by hand, with expressions, values or a
+  select, on blocks of rows; or with records, one row by its primary key.
+  Transactions that group them come next.
 
 ## Why portability matters
 
@@ -66,10 +70,11 @@ added.
 java/src/msfx/lib/util       utilities: properties, JSON, copying
 java/src/msfx/lib/md         metadata
 java/src/msfx/lib/db         engines, connections, pool, adapters
-java/src/msfx/lib/db/query   query generator
-java/src/test                manual tests against a local SQL Server
+java/src/msfx/lib/db/query   query generator, and the SQL analyzer in db/query/sa
+java/src/test                tests against a local SQL Server; test.claude.RunAll runs them all
 java/lib                     JDBC drivers (the JDK and JavaFX are downloaded separately)
 java/doc                     generated Javadoc
+docs                         notes on the development
 ```
 
 ## License and credits
@@ -78,3 +83,10 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
 Developed by Miquel Sas with the assistance of Claude (Anthropic). See
 [NOTICE](NOTICE).
+
+## Development time
+
+About **40 hours** of coding effort up to 2026-11-17, for all of the above:
+about 20,700 lines of library and 5,100 lines of tests, Javadoc included.
+Time is tracked from then on, by the active time of the sessions with Claude
+Code. See [docs/development-time.md](docs/development-time.md).

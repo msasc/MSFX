@@ -10,8 +10,10 @@ java/lib/javafx/
 java/res/cma/
 
 # --- Claude Code ---------------------------------------------------
-# Personal settings of this project, such as permissions
+# Personal settings of this project, such as permissions, and the raw log of
+# session times, summarized in docs/development-time.md
 .claude/settings.local.json
+.claude/time-log.csv
 
 # --- Windows -------------------------------------------------------
 Thumbs.db
